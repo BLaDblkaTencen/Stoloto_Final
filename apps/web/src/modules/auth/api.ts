@@ -3,8 +3,10 @@
 import type { AuthResponse, LoginBody, RegisterBody } from '@sport/shared/schemas/auth';
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
+import { meQueryKey } from '../../shared/api/queryClient';
 
-export const meQueryKey = ['auth', 'me'] as const;
+// Ключ общий с queryClient: тот сбрасывает вход по ответу 401.
+export { meQueryKey };
 
 /** Вошедший пользователь: data — AuthUser или null. */
 export function useMe() {
@@ -53,5 +55,7 @@ export function useLogout() {
  * /login?next=https://чужой-сайт увела бы пользователя после ввода пароля.
  */
 export function safeNext(next: string | null) {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  // «//сайт» и «/\сайт» браузер понимает как адрес другого сайта: после первого «/» не должно
+  // идти ни «/», ни «\».
+  return next && /^\/(?![/\\])/.test(next) ? next : '/';
 }
