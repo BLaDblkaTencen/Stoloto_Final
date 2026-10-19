@@ -1,5 +1,5 @@
 #!/bin/sh
-# Запусти один раз: у каждого Claude своя папка и ветка, без конфликтов рабочих копий.
-git worktree add ../sp-A -b feature/events-core
-git worktree add ../sp-B -b feature/org-admin-core
-git worktree add ../sp-C -b feature/core-skeleton
+# Запусти один раз после мёржа в main: у каждого участника своя папка и ветка.
+git worktree add ../sp-user  -b feature/user-core
+git worktree add ../sp-org   -b feature/org-core
+git worktree add ../sp-admin -b feature/admin-core
