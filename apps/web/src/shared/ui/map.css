@@ -134,11 +134,22 @@
   line-height: 44px;
 }
 
-/* Атрибуция OpenStreetMap обязательна (лицензия ODbL) и тоже не мельче 16px. */
+/*
+ * Атрибуция OpenStreetMap обязательна (лицензия ODbL), но это не текст интерфейса: по решению
+ * капитана она еле заметна и проявляется при наведении или фокусе. Исключение из правила 16px.
+ */
 .map-frame .leaflet-control-attribution {
-  padding: 2px 8px;
+  padding: 0 6px;
+  background: transparent;
+  font-size: 11px;
+  line-height: 1.6;
+  opacity: 0.35;
+  transition: opacity 0.15s;
+}
+.map-frame .leaflet-control-attribution:hover,
+.map-frame .leaflet-control-attribution:focus-within {
   background: rgb(255 255 255 / 0.9);
-  font-size: var(--text-sm);
+  opacity: 1;
 }
 .map-frame .leaflet-control-attribution a {
   color: var(--color-ink);
