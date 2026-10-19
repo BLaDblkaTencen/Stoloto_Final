@@ -1,0 +1,86 @@
+/*
+ * Дизайн-токены «Вместе»: стиль «мягкий необрутализм».
+ * Единственный источник цветов, шрифтов, радиусов и теней. В приложении
+ * подключается один раз (apps/web), Tailwind читает эти переменные через @theme.
+ */
+
+:root {
+  /* Основа */
+  --color-bg: #eaf3ff;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f4fa;
+  --color-ink: #15181e;
+  --color-ink-muted: #3a3f4b;
+  --color-line: #15181e;
+  --color-line-soft: #c9d2e3;
+
+  /* Действия: основная кнопка, тёмная (заявка, вторичное важное), опасная */
+  --color-primary: #3a4bd8;
+  --color-primary-ink: #ffffff;
+  --color-accent: #ffd447;
+  --color-danger: #c2352b;
+  --color-danger-ink: #ffffff;
+
+  /*
+   * Статусы из DATA_MODEL.md. Это фон бейджа, текст всегда --color-ink.
+   * Цвет никогда не единственный признак: рядом всегда подпись и иконка.
+   */
+  --status-success: #9be7c4; /* Вы записаны, Допущена, Опубликовано */
+  --status-warning: #ffd447; /* Заявка ждёт решения, На рассмотрении */
+  --status-danger: #ffb8a8; /* Заявка отклонена, Отклонена, Удалено */
+  --status-neutral: #e3e8f0; /* Запись отменена, Снято с публикации */
+  --status-free: #a9d4ff; /* Свободная запись */
+  --status-request: #c9b8ff; /* По заявке */
+
+  /*
+   * Палитра видов спорта: плашки, чипы и метки на карте.
+   * Новый вид спорта получает цвет по индексу (хэш slug % 8), без правок кода.
+   */
+  --sport-1: #9be7c4;
+  --sport-2: #ffb8a8;
+  --sport-3: #c9b8ff;
+  --sport-4: #ffd447;
+  --sport-5: #a9d4ff;
+  --sport-6: #ffc6e5;
+  --sport-7: #b8f0f0;
+  --sport-8: #ffd9a8;
+
+  /* Карта (стиль нарисованного макета; на Leaflet красим только метки и попапы) */
+  --map-land: #f1f7e9;
+  --map-park: #cdebc4;
+  --map-park-line: #8dbf84;
+  --map-water: #a9d4ff;
+  --map-road: #ffffff;
+
+  /* Шрифты: оба с полной кириллицей, Google Fonts, OFL */
+  --font-display: 'Comfortaa', 'Rubik', system-ui, sans-serif;
+  --font-body: 'Rubik', system-ui, sans-serif;
+
+  /* Размеры текста: минимум 16px для любого текста в интерфейсе */
+  --text-sm: 16px;
+  --text-base: 17px;
+  --text-lg: 20px;
+  --text-h3: 20px;
+  --text-h2: 30px;
+  --text-h1: 52px;
+  --text-h1-mobile: 34px;
+
+  /* Форма */
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+  --border-width: 2px;
+  --border: var(--border-width) solid var(--color-line);
+  --border-dashed: var(--border-width) dashed var(--color-line-soft);
+
+  /* Тени: жёсткие, без размытия — главный признак стиля */
+  --shadow-sm: 2px 2px 0 var(--color-line);
+  --shadow-md: 4px 4px 0 var(--color-line);
+  --shadow-lg: 6px 6px 0 var(--color-line);
+
+  /* Управляющие элементы: высота не меньше 48px */
+  --control-height: 48px;
+  --control-height-lg: 56px;
+}
