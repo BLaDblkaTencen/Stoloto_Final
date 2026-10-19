@@ -74,8 +74,13 @@
     font-family: var(--font-display);
     font-weight: 700;
   }
+  /* Наведение на ссылку: текст остаётся тёмным, подчёркивание — толстое жёлтое, как акцент
+     дизайна. Синий цвет при наведении путали с кнопкой «Записаться». */
   a:hover {
-    color: var(--color-primary);
+    text-decoration-line: underline;
+    text-decoration-color: var(--color-accent);
+    text-decoration-thickness: 3px;
+    text-underline-offset: 4px;
   }
   :focus-visible {
     outline: 3px solid var(--color-primary);

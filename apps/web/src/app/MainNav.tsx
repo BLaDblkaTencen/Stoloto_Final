@@ -27,7 +27,7 @@ export function MainNav() {
           to={item.to}
           end={item.to === '/'}
           className={({ isActive }) =>
-            `inline-flex min-h-[var(--control-height)] items-center no-underline ${isActive ? 'shadow-[inset_0_-3px_0_var(--color-accent)]' : ''}`
+            `inline-flex min-h-[var(--control-height)] items-center no-underline transition-[translate,box-shadow] duration-100 hover:-translate-y-0.5 hover:no-underline hover:shadow-[inset_0_-3px_0_var(--color-accent)] ${isActive ? 'shadow-[inset_0_-3px_0_var(--color-accent)]' : ''}`
           }
         >
           {item.label}
