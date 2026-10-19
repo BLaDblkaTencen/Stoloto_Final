@@ -13,6 +13,20 @@ import {
 } from '@sport/shared';
 import { pgEnum, timestamp } from 'drizzle-orm/pg-core';
 
+// Те же массивы доступны и отсюда: на них уже опирается код модулей. В новом коде
+// импортируйте их из '@sport/shared'.
+export {
+  AUDIT_ACTIONS,
+  AUDIT_TARGETS,
+  EVENT_LEVELS,
+  EVENT_STATUSES,
+  JOIN_MODES,
+  ORG_STATUSES,
+  REGISTRATION_STATUSES,
+  USER_ROLES,
+  VENUE_TYPES,
+};
+
 export const userRole = pgEnum('user_role', USER_ROLES);
 export const orgStatus = pgEnum('org_status', ORG_STATUSES);
 export const eventStatus = pgEnum('event_status', EVENT_STATUSES);

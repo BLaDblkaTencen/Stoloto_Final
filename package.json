@@ -11,6 +11,7 @@
     "build": "pnpm --filter @sport/web build",
     "start": "pnpm --filter @sport/api start",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
     "db:push": "pnpm --filter @sport/api db:push",
     "db:seed": "pnpm --filter @sport/api db:seed",
     "format": "prettier --write apps packages",

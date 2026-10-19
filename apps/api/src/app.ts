@@ -7,8 +7,9 @@ import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { isProduction } from './env';
-import { AppError, registerErrorHandling } from './lib/errors';
+import { errors, registerErrorHandling } from './lib/errors';
 import { registerModules } from './modules';
+import { registerAuth } from './modules/auth/guards';
 
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
@@ -36,6 +37,7 @@ export async function buildApp() {
   await app.register(rateLimit, { global: false });
 
   registerErrorHandling(app);
+  registerAuth(app);
   await registerModules(app);
 
   // В проде один процесс отдаёт и API, и собранный фронтенд: один адрес, без CORS.
@@ -44,7 +46,7 @@ export async function buildApp() {
   }
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith('/api') || !isProduction) {
-      throw new AppError('NOT_FOUND', 'Не найдено');
+      throw errors.notFound();
     }
     // Маршруты интерфейса (/events/42 и т.п.) обрабатывает React Router.
     return reply.sendFile('index.html');
