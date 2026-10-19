@@ -15,7 +15,15 @@ const schema = z.object({
   SEED_ON_START: z.stringbool().default(false),
 });
 
-const parsed = schema.safeParse(process.env);
+// Вне продакшна без .env берём локальную базу из .env.example: так тесты, которым база
+// не нужна, запускаются сразу после клонирования. В проде DATABASE_URL обязателен.
+const LOCAL_DATABASE_URL = 'postgres://sport:sport@127.0.0.1:5432/sport';
+const parsed = schema.safeParse({
+  ...process.env,
+  DATABASE_URL:
+    process.env.DATABASE_URL ??
+    (process.env.NODE_ENV === 'production' ? undefined : LOCAL_DATABASE_URL),
+});
 if (!parsed.success) {
   console.error('Ошибка в переменных окружения (см. .env.example):');
   for (const issue of parsed.error.issues)

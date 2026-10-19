@@ -6,7 +6,7 @@ import type { UserRole } from '@sport/shared';
 import { and, eq, gt } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { sessions, users } from '../../db/schema';
-import { env, isProduction } from '../../env';
+import { env } from '../../env';
 
 export const SESSION_COOKIE = 'sid';
 
@@ -21,7 +21,9 @@ export const sessionCookieOptions = () => ({
   path: '/',
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: isProduction,
+  // Secure только при HTTPS: на Render (за прокси, trustProxy) cookie защищена, а локальный
+  // запуск по http://127.0.0.1 не теряет вход после перезагрузки страницы.
+  secure: 'auto' as const,
   maxAge: ttlMs() / 1000,
 });
 

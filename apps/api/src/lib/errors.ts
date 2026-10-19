@@ -1,7 +1,7 @@
 // Ошибки API и их перевод в единый ответ { error: { code, message, fields? } }.
 // В сервисах бросаем AppError (свой код модуля) или errors.* (общие случаи); ZodError из parse()
 // превращается в 422 с ошибками по полям. Формат описан в docs/api.md.
-import type { ApiErrorBody } from '@sport/shared';
+import { zodFieldErrors, type ApiErrorBody } from '@sport/shared';
 import type { FastifyError, FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
@@ -45,23 +45,13 @@ export function parse<T extends z.ZodType>(schema: T, data: unknown): z.infer<T>
   return schema.parse(data);
 }
 
-/** Ошибки Zod по полям: { 'address.city': 'Обязательное поле' }, по одной на поле. */
-export function zodFields(error: z.ZodError): Record<string, string> {
-  const fields: Record<string, string> = {};
-  for (const issue of error.issues) {
-    const path = issue.path.join('.') || '_';
-    fields[path] ??= issue.message;
-  }
-  return fields;
-}
-
 export function registerErrorHandling(app: FastifyInstance) {
   app.setErrorHandler((err: FastifyError | Error, request, reply) => {
     if (err instanceof AppError) {
       return reply.status(err.status).send(err.toBody());
     }
     if (err instanceof z.ZodError) {
-      return reply.status(422).send(errors.validation(zodFields(err)).toBody());
+      return reply.status(422).send(errors.validation(zodFieldErrors(err)).toBody());
     }
     const status = 'statusCode' in err ? (err.statusCode ?? 500) : 500;
     if (status === 429) {

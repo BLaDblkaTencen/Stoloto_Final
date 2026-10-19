@@ -4,3 +4,4 @@
 export * from './enums';
 export * from './errors';
 export * from './demo';
+export * from './labels';
