@@ -6,7 +6,9 @@ import {
   updateProfileSchema,
   type UserProfile,
 } from '@sport/shared/schemas/profiles';
-import { useState, type FormEvent } from 'react';
+import type { EventListItem } from '@sport/shared/schemas/events';
+import type { Sport } from '@sport/shared/schemas/sports';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
@@ -19,17 +21,23 @@ import {
   EmptyState,
   ErrorState,
   FieldError,
+  Icon,
+  JoinModeBadge,
   Skeleton,
   SkeletonList,
   SportChip,
+  sportColor,
+  sportIcon,
+  StatusBadge,
   TextareaField,
   TextField,
 } from '../../shared/ui';
 import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { formErrors, useFreshErrors } from '../org/errors';
-import { useProfile, useSports, useUpdateProfile } from './api';
-import { EventCard } from './EventCard';
+import { useMyRegistrations, useProfile, useSports, useUpdateProfile } from './api';
+import { MetaLine } from './EventBits';
+import { formatSeats, formatSince, formatWhen } from './format';
 
 export function ProfilePage() {
   const { id = '' } = useParams();
@@ -58,51 +66,208 @@ export function ProfilePage() {
     return <ErrorState error={profile.error} onRetry={() => profile.refetch()} />;
   }
 
-  const data = profile.data;
-  const isMe = me.data?.id === data.id;
+  return <ProfileView profile={profile.data} isMe={me.data?.id === profile.data.id} />;
+}
+
+type Tab = 'organizes' | 'joins' | 'interests';
+
+/**
+ * Профиль как страница клуба: обложка в цвете любимого вида спорта, крупный аватар, вкладки
+ * «Собирает», «Мои записи» (только свой профиль: куда человек ходит, видит он один) и «Интересы».
+ */
+function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean }) {
+  const [tab, setTab] = useState<Tab>('organizes');
+  const mine = useMyRegistrations(isMe, 20);
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'organizes', label: `Собирает · ${profile.upcomingEvents.length}` },
+    ...(isMe && mine.data
+      ? [{ key: 'joins' as const, label: `Мои записи · ${mine.data.total}` }]
+      : []),
+    { key: 'interests', label: `Интересы · ${profile.sports.length}` },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
-      <Card className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-4">
-          <Avatar name={data.name} size={72} />
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <h1 className="text-h2 leading-tight">{data.name}</h1>
-            {data.city && <p className="text-ink-muted">{data.city}</p>}
+      <div>
+        <Cover sports={profile.sports} />
+        <div className="relative -mt-14 flex flex-wrap items-start gap-4 px-4 sm:px-6">
+          <span className="rounded-full shadow-md">
+            <Avatar name={profile.name} size={112} />
+          </span>
+          <div className="mt-16 flex min-w-0 flex-1 flex-col gap-1">
+            <h1 className="text-h2 leading-tight">{profile.name}</h1>
+            <p className="text-ink-muted">
+              {[profile.city, `на «Вместе» с ${formatSince(profile.memberSince)}`]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
           </div>
           {isMe && (
-            <ButtonLink to="/me/profile" variant="secondary">
+            <ButtonLink to="/me/profile" variant="secondary" className="mt-16">
               Изменить профиль
             </ButtonLink>
           )}
         </div>
-        {data.about && <p className="whitespace-pre-line">{data.about}</p>}
-        {data.sports.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <h2 className="font-semibold">Интересы</h2>
-            <div className="flex flex-wrap gap-2">
-              {data.sports.map((sport) => (
-                <Badge key={sport.id} icon={null}>
+      </div>
+
+      {profile.about ? (
+        <p className="max-w-3xl text-lg whitespace-pre-line">{profile.about}</p>
+      ) : (
+        isMe && (
+          <p className="text-ink-muted">
+            Расскажите о себе в <Link to="/me/profile">профиле</Link>: опыт и любимые занятия увидит
+            организатор в вашей заявке.
+          </p>
+        )
+      )}
+
+      <div
+        role="tablist"
+        aria-label="Разделы профиля"
+        className="flex flex-wrap gap-x-7 border-b-2 border-line-soft"
+      >
+        {tabs.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.key}
+            onClick={() => setTab(item.key)}
+            className={`min-h-[var(--control-height)] cursor-pointer font-semibold transition-[box-shadow] ${tab === item.key ? 'shadow-[inset_0_-4px_0_var(--color-accent)]' : 'hover:shadow-[inset_0_-4px_0_var(--color-line-soft)]'}`}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      <div role="tabpanel">
+        {tab === 'organizes' &&
+          (profile.upcomingEvents.length === 0 ? (
+            <EmptyState
+              icon="calendar"
+              title="Ближайших встреч нет"
+              text={isMe ? 'Соберите людей на своё занятие, это пара минут.' : undefined}
+              action={isMe ? <ButtonLink to="/events/new">Создать встречу</ButtonLink> : undefined}
+            />
+          ) : (
+            <CardGrid>
+              {profile.upcomingEvents.map((event) => (
+                <ProfileEventCard key={event.id} event={event} />
+              ))}
+            </CardGrid>
+          ))}
+        {tab === 'joins' &&
+          mine.data &&
+          (mine.data.items.length === 0 ? (
+            <EmptyState
+              icon="people"
+              title="Вы пока никуда не записаны"
+              action={<ButtonLink to="/">Найти встречу</ButtonLink>}
+            />
+          ) : (
+            <CardGrid>
+              {mine.data.items.map((item) => (
+                <ProfileEventCard
+                  key={item.id}
+                  event={item}
+                  status={
+                    item.status === 'published' ? (
+                      <StatusBadge kind="registration" status={item.myRegistration.status} />
+                    ) : (
+                      <StatusBadge kind="event" status={item.status} />
+                    )
+                  }
+                />
+              ))}
+            </CardGrid>
+          ))}
+        {tab === 'interests' &&
+          (profile.sports.length === 0 ? (
+            <p className="text-ink-muted">Интересы пока не указаны.</p>
+          ) : (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(120px,1fr))] gap-3">
+              {profile.sports.map((sport) => (
+                <Link
+                  key={sport.id}
+                  to={`/?sport=${sport.id}`}
+                  className="flex min-h-[112px] flex-col items-center justify-center gap-2 rounded-[18px] border-2 border-ink p-3 text-center font-semibold no-underline transition-[translate,box-shadow] duration-100 hover:-translate-y-0.5 hover:shadow-sm"
+                  style={{ background: sportColor(sport.slug) }}
+                >
+                  <Icon name={sportIcon(sport.slug)} size={32} strokeWidth={1.7} />
                   {sport.name}
-                </Badge>
+                </Link>
               ))}
             </div>
-          </div>
-        )}
-      </Card>
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-h3">Организует</h2>
-        {data.upcomingEvents.length === 0 ? (
-          <p className="text-ink-muted">Ближайших встреч нет.</p>
-        ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
-            {data.upcomingEvents.map((event) => (
-              <EventCard key={event.id} event={event} />
-            ))}
-          </div>
-        )}
-      </section>
+          ))}
+      </div>
     </div>
+  );
+}
+
+/** Обложка: точечный узор в цвете первого интереса и до трёх «марок» с видами спорта. */
+function Cover({ sports }: { sports: Sport[] }) {
+  const color = sports[0] ? sportColor(sports[0].slug) : 'var(--color-accent)';
+  const places = [
+    { right: '6%', top: '18%', rotate: '8deg' },
+    { right: '17%', top: '46%', rotate: '-6deg' },
+    { right: '29%', top: '16%', rotate: '4deg' },
+  ];
+  return (
+    <div
+      aria-hidden="true"
+      className="relative h-36 overflow-hidden rounded-lg border-2 border-ink"
+      style={{
+        backgroundColor: color,
+        backgroundImage: 'radial-gradient(var(--color-ink) 1.2px, transparent 1.3px)',
+        backgroundSize: '18px 18px',
+      }}
+    >
+      {sports.slice(0, 3).map((sport, index) => (
+        <span
+          key={sport.id}
+          className="absolute hidden size-14 items-center justify-center rounded-md border-2 border-ink shadow-sm sm:inline-flex"
+          style={{
+            ...places[index],
+            background: index ? sportColor(sport.slug) : 'var(--color-surface)',
+          }}
+        >
+          <Icon name={sportIcon(sport.slug)} size={28} strokeWidth={1.8} />
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function CardGrid({ children }: { children: ReactNode }) {
+  return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{children}</div>;
+}
+
+/** Встреча в профиле: цветная шапка с видом спорта и режимом, ниже когда, где и места. */
+function ProfileEventCard({ event, status }: { event: EventListItem; status?: ReactNode }) {
+  return (
+    <article className="flex flex-col overflow-hidden rounded-lg border-2 border-ink bg-surface shadow-sm">
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-ink px-4 py-2.5 font-semibold"
+        style={{ background: sportColor(event.sport.slug) }}
+      >
+        <span className="flex items-center gap-2">
+          <Icon name={sportIcon(event.sport.slug)} size={20} />
+          {event.sport.name}
+        </span>
+        <JoinModeBadge mode={event.joinMode} />
+      </div>
+      <div className="flex flex-1 flex-col gap-1.5 p-4">
+        <h3 className="text-[19px] leading-snug">
+          <Link to={`/events/${event.id}`} className="no-underline hover:underline">
+            {event.title}
+          </Link>
+        </h3>
+        <MetaLine icon="calendar">{formatWhen(event.startsAt, event.endsAt)}</MetaLine>
+        <MetaLine icon="pin">{event.address}</MetaLine>
+        <MetaLine icon="people">{formatSeats(event.participantsCount, event.capacity)}</MetaLine>
+        {status && <div className="mt-1">{status}</div>}
+      </div>
+    </article>
   );
 }
 

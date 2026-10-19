@@ -17,7 +17,7 @@ import {
   type EventInput,
 } from '@sport/shared/schemas/events';
 import { normalizeSportName, sportSlug } from '@sport/shared/schemas/sports';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
@@ -27,8 +27,7 @@ import {
   Card,
   EmptyState,
   ErrorState,
-  RadioCards,
-  SelectField,
+  Chip,
   Skeleton,
   SkeletonList,
   TextareaField,
@@ -39,7 +38,8 @@ import { useMe } from '../auth/api';
 import { useMyOrganization } from '../org/api';
 import { MapPicker, useVenue, type PlaceValue } from '../org/map';
 import { useCreateEvent, useEvent, useSports, useUpdateEvent } from './api';
-import { isoDay, localParts, LOCAL_TIME_NOTE, toUtcIso } from './format';
+import { DayPicker, JoinModeCards, SeatsField, SportTiles, TimePicker } from './EventFormParts';
+import { localParts, LOCAL_TIME_NOTE, toUtcIso } from './format';
 
 /** Значение списка видов спорта «Другое — впишу сам». */
 const CUSTOM_SPORT = 'custom';
@@ -283,6 +283,11 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
           ← {event ? 'К событию' : 'Все встречи'}
         </Link>
         <h1 className="text-h2">{event ? 'Изменить встречу' : 'Новая встреча'}</h1>
+        <p className="text-ink-muted">
+          {event
+            ? 'Участники увидят изменения сразу.'
+            : 'Займёт пару минут: почти всё выбирается кнопками.'}
+        </p>
       </div>
 
       {me.data?.role === 'organization' && !event && <PublishAs />}
@@ -298,27 +303,18 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
         <Alert>Проверьте поля, отмеченные ниже</Alert>
       )}
 
-      <Card className="flex flex-col gap-5">
-        <h2 className="text-h3">Что за встреча</h2>
-        <TextField
-          label="Название"
-          placeholder="Например: Утренняя пробежка по острову"
-          maxLength={EVENT_LIMITS.title.max}
-          value={form.title}
-          onChange={(e) => set('title')(e.target.value)}
-          error={errors.title}
-        />
-        <SelectField
-          label="Вид спорта"
-          placeholder={sports.isPending ? 'Загружаем список…' : 'Выберите вид спорта'}
-          options={[
-            ...(sports.data ?? []).map((sport) => ({ value: sport.id, label: sport.name })),
-            { value: CUSTOM_SPORT, label: 'Другое — впишу сам' },
-          ]}
-          value={form.sportId}
-          onChange={(e) => set('sportId')(e.target.value)}
-          error={form.sportId === CUSTOM_SPORT ? undefined : errors.sportId}
-        />
+      <Section title="Чем займёмся?">
+        {sports.isPending ? (
+          <Skeleton className="h-56 w-full" />
+        ) : (
+          <SportTiles
+            sports={sports.data ?? []}
+            value={form.sportId}
+            customValue={CUSTOM_SPORT}
+            onChange={set('sportId')}
+            error={form.sportId === CUSTOM_SPORT ? undefined : errors.sportId}
+          />
+        )}
         {form.sportId === CUSTOM_SPORT && (
           <TextField
             label="Свой вид спорта"
@@ -335,48 +331,40 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
             error={errors.sportId}
           />
         )}
+        <TextField
+          label="Название"
+          placeholder="Например: Утренняя пробежка по острову"
+          maxLength={EVENT_LIMITS.title.max}
+          value={form.title}
+          onChange={(e) => set('title')(e.target.value)}
+          error={errors.title}
+        />
         <TextareaField
-          label="Описание"
+          label="Что будет на встрече"
           hint="Что будете делать, в каком темпе, кому подойдёт"
-          rows={5}
+          rows={4}
           maxLength={EVENT_LIMITS.description.max}
           value={form.description}
           onChange={(e) => set('description')(e.target.value)}
           error={errors.description}
         />
-      </Card>
+      </Section>
 
-      <Card className="flex flex-col gap-5">
-        <h2 className="text-h3">Когда</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <TextField
-            label="Дата"
-            type="date"
-            min={isoDay(0)}
-            value={form.date}
-            onChange={(e) => set('date')(e.target.value)}
-            error={errors.date}
-          />
-          <TextField
-            label="Начало"
-            type="time"
-            value={form.startTime}
-            onChange={(e) => set('startTime')(e.target.value)}
-          />
-          <TextField
-            label="Окончание"
-            hint="Необязательно"
-            type="time"
-            value={form.endTime}
-            onChange={(e) => set('endTime')(e.target.value)}
-            error={errors.endsAt}
-          />
-        </div>
-        <p className="text-sm text-ink-muted">{LOCAL_TIME_NOTE}</p>
-      </Card>
+      <Section title="Когда?" note={LOCAL_TIME_NOTE}>
+        <DayPicker value={form.date} onChange={set('date')} error={errors.date} />
+        <TimePicker value={form.startTime} onChange={set('startTime')} />
+        <TextField
+          label="Окончание"
+          hint="Необязательно"
+          type="time"
+          className="max-w-xs"
+          value={form.endTime}
+          onChange={(e) => set('endTime')(e.target.value)}
+          error={errors.endsAt}
+        />
+      </Section>
 
-      <Card className="flex flex-col gap-5">
-        <h2 className="text-h3">Где</h2>
+      <Section title="Где?">
         <MapPicker
           sportId={form.sportId && form.sportId !== CUSTOM_SPORT ? form.sportId : undefined}
           value={form.place}
@@ -405,51 +393,34 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
           onChange={(e) => set('placeNotes')(e.target.value)}
           error={errors.placeNotes}
         />
-      </Card>
+      </Section>
 
-      <Card className="flex flex-col gap-5">
-        <h2 className="text-h3">Как записываться</h2>
-        <RadioCards
-          legend="Режим записи"
-          value={form.joinMode}
-          onChange={set('joinMode')}
-          error={errors.joinMode}
-          options={[
-            {
-              value: 'free',
-              title: 'Свободная запись',
-              text: 'Человек нажимает «Записаться» и сразу в списке участников',
-            },
-            {
-              value: 'request',
-              title: 'По заявке',
-              text: 'Вы смотрите заявки и решаете, кого принять',
-            },
-          ]}
-        />
-        <div className="grid gap-4 sm:grid-cols-2">
-          <SelectField
-            label="Уровень подготовки"
-            options={EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_LABELS[value] }))}
-            value={form.level}
-            onChange={(e) => set('level')(e.target.value as EventLevel)}
-            error={errors.level}
-          />
-          <TextField
-            label="Сколько мест"
-            hint="Пусто — без ограничения"
-            type="number"
-            inputMode="numeric"
-            min={EVENT_LIMITS.capacity.min}
-            max={EVENT_LIMITS.capacity.max}
-            value={form.capacity}
-            onChange={(e) => set('capacity')(e.target.value)}
-            error={errors.capacity}
-          />
+      <Section title="Как записываться?">
+        <JoinModeCards value={form.joinMode} onChange={set('joinMode')} error={errors.joinMode} />
+        <div className="flex flex-wrap gap-x-10 gap-y-5">
+          <SeatsField value={form.capacity} onChange={set('capacity')} error={errors.capacity} />
+          <fieldset className="flex min-w-0 flex-col">
+            <legend className="mb-2.5 font-semibold">Уровень подготовки</legend>
+            <div className="flex flex-wrap gap-2.5">
+              {EVENT_LEVELS.map((level, index) => (
+                <Chip
+                  key={level}
+                  index={index}
+                  pressed={form.level === level}
+                  onClick={() => set('level')(level)}
+                >
+                  {EVENT_LEVEL_LABELS[level]}
+                </Chip>
+              ))}
+            </div>
+          </fieldset>
         </div>
+      </Section>
+
+      <Section title="Что ещё знать участникам" note="Необязательно">
         <TextareaField
           label="Условия участия"
-          hint="Необязательно: что взять, какая нужна подготовка, есть ли инвентарь"
+          hint="Что взять, какая нужна подготовка, есть ли инвентарь"
           rows={3}
           maxLength={EVENT_LIMITS.requirements.max}
           value={form.requirements}
@@ -458,14 +429,14 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
         />
         <TextField
           label="Ссылка на чат участников"
-          hint="Необязательно. Увидят только подтверждённые участники"
+          hint="Увидят только подтверждённые участники"
           type="url"
           placeholder="https://t.me/…"
           value={form.chatUrl}
           onChange={(e) => set('chatUrl')(e.target.value)}
           error={errors.chatUrl}
         />
-      </Card>
+      </Section>
 
       <div className="flex flex-wrap gap-3">
         <Button type="submit" size="lg" loading={saving}>
@@ -504,6 +475,19 @@ function PublishAs() {
     <Card tone="accent" className="p-4 font-semibold">
       Встреча будет опубликована от имени организации «{org.data.name}», сразу и без повторной
       проверки.
+    </Card>
+  );
+}
+
+/** Блок формы: заголовок-вопрос и, справа, короткая пометка. */
+function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  return (
+    <Card className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-h3">{title}</h2>
+        {note && <span className="text-sm text-ink-muted">{note}</span>}
+      </div>
+      {children}
     </Card>
   );
 }

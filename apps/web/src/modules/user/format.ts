@@ -49,6 +49,27 @@ export function formatShort(startsAt: string) {
   return `${capitalize(shortDayFormat.format(start))} · ${timeFormat.format(start)}`;
 }
 
+/** День «2026-10-24» → «Сб, 24 окт.» — подпись кнопки дня в форме. */
+export function formatDayLabel(day: string) {
+  // Полдень по Красноярску: в любом поясе браузера это тот же календарный день.
+  return capitalize(shortDayFormat.format(new Date(`${day}T12:00:00+07:00`)));
+}
+
+const monthYearFormat = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: EVENT_TIMEZONE,
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+});
+
+/** «сентября 2026» — для «На «Вместе» с …». */
+export function formatSince(iso: string) {
+  return monthYearFormat
+    .format(new Date(iso))
+    .replace(/^\d+\s/, '')
+    .replace(/\s?г\.$/, '');
+}
+
 /** «26 октября, 14:05» — для времени заявки и комментариев. */
 export function formatMoment(value: string) {
   const date = new Date(value);

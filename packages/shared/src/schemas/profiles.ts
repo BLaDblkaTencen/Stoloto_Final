@@ -55,6 +55,8 @@ export type UserProfile = {
   name: string;
   about: string | null;
   city: string | null;
+  /** Дата регистрации (ISO): «На «Вместе» с сентября 2026». */
+  memberSince: string;
   sports: Sport[];
   /** Ближайшие опубликованные события, которые человек организует. */
   upcomingEvents: EventListItem[];

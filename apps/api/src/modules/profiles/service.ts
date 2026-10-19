@@ -39,7 +39,13 @@ async function upcomingEvents(userId: string, viewerId: string | null): Promise<
 export async function getProfile(id: string, viewerId: string | null): Promise<UserProfile> {
   const [[user], interests, upcoming] = await Promise.all([
     db
-      .select({ id: users.id, name: users.name, about: users.about, city: users.city })
+      .select({
+        id: users.id,
+        name: users.name,
+        about: users.about,
+        city: users.city,
+        createdAt: users.createdAt,
+      })
       .from(users)
       .where(eq(users.id, id)),
     db
@@ -51,7 +57,13 @@ export async function getProfile(id: string, viewerId: string | null): Promise<U
     upcomingEvents(id, viewerId),
   ]);
   if (!user) throw userNotFound();
-  return { ...user, sports: interests, upcomingEvents: upcoming };
+  const { createdAt, ...rest } = user;
+  return {
+    ...rest,
+    memberSince: createdAt.toISOString(),
+    sports: interests,
+    upcomingEvents: upcoming,
+  };
 }
 
 export async function updateMyProfile(
