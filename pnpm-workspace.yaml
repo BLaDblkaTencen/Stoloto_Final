@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 10 не запускает скрипты установки пакетов без явного разрешения.
+# esbuild (нужен tsx и drizzle-kit) проверяет при установке свой бинарный файл.
+onlyBuiltDependencies:
+  - esbuild
