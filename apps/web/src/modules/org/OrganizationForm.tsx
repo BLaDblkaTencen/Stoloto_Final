@@ -16,6 +16,7 @@ import {
   TextField,
 } from '../../shared/ui';
 import { useSports } from './api';
+import { useFreshErrors } from './errors';
 
 type Props = {
   initial?: OrganizationOwner;
@@ -50,18 +51,23 @@ export function OrganizationForm({
   });
   const [sportIds, setSportIds] = useState<string[]>(initial?.sports.map((s) => s.id) ?? []);
   const [clientFields, setClientFields] = useState<Record<string, string>>({});
-  const fields = Object.keys(clientFields).length > 0 ? clientFields : serverFields;
+  const fresh = useFreshErrors(Object.keys(clientFields).length > 0 ? clientFields : serverFields);
 
-  const set = (key: keyof typeof form) => (value: string) =>
+  const set = (key: keyof typeof form) => (value: string) => {
+    fresh.edit(key);
     setForm((current) => ({ ...current, [key]: value }));
+  };
 
-  const toggleSport = (id: string) =>
+  const toggleSport = (id: string) => {
+    fresh.edit('sportIds');
     setSportIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
     );
+  };
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
+    fresh.reset();
     const parsed = createOrganizationBody.safeParse({ ...form, sportIds });
     if (!parsed.success) return setClientFields(zodFieldErrors(parsed.error));
     setClientFields({});
@@ -77,14 +83,14 @@ export function OrganizationForm({
         hint="Как вас будут видеть участники, например «Шахматный клуб „Ладья“»"
         value={form.name}
         onChange={(e) => set('name')(e.target.value)}
-        error={fields.name}
+        error={fresh.errorOf('name')}
       />
       <TextField
         label="Вид объединения"
         hint="Клуб, кружок, федерация, компания, сообщество"
         value={form.activity}
         onChange={(e) => set('activity')(e.target.value)}
-        error={fields.activity}
+        error={fresh.errorOf('activity')}
       />
       <TextareaField
         label="Чем вы занимаетесь"
@@ -92,7 +98,7 @@ export function OrganizationForm({
         rows={5}
         value={form.description}
         onChange={(e) => set('description')(e.target.value)}
-        error={fields.description}
+        error={fresh.errorOf('description')}
       />
 
       <fieldset className="flex flex-col gap-2">
@@ -114,7 +120,7 @@ export function OrganizationForm({
             ))}
           </div>
         )}
-        {fields.sportIds && <FieldError>{fields.sportIds}</FieldError>}
+        {fresh.errorOf('sportIds') && <FieldError>{fresh.errorOf('sportIds')}</FieldError>}
       </fieldset>
 
       <TextField
@@ -123,14 +129,14 @@ export function OrganizationForm({
         autoComplete="address-level2"
         value={form.city}
         onChange={(e) => set('city')(e.target.value)}
-        error={fields.city}
+        error={fresh.errorOf('city')}
       />
       <TextField
         label="Контакты"
         hint="Необязательно. Телефон, почта или ссылка на сообщество — их увидят все"
         value={form.contacts}
         onChange={(e) => set('contacts')(e.target.value)}
-        error={fields.contacts}
+        error={fresh.errorOf('contacts')}
       />
 
       <div className="flex flex-wrap gap-3">
