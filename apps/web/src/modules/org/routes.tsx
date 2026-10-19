@@ -13,6 +13,10 @@ export const orgRoutes: RouteObject[] = [
     lazy: async () => ({ Component: (await import('./OrganizationsPage')).OrganizationsPage }),
   },
   {
+    path: 'map',
+    lazy: async () => ({ Component: (await import('./map/MapPage')).MapPage }),
+  },
+  {
     path: 'organizations/:id',
     lazy: async () => ({ Component: (await import('./OrganizationPage')).OrganizationPage }),
   },

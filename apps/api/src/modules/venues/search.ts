@@ -1,15 +1,13 @@
 // Поиск площадок без обращения к базе (задача 2.8). Справочник небольшой и меняется только сидом,
 // поэтому сервис держит его в памяти, а фильтры применяются здесь.
-import type { VenueType } from '@sport/shared';
 import {
   inBbox,
-  VENUE_TYPE_LABELS,
   type Venue,
   type VenueCard,
   type VenuesQuery,
   type VenueTypesResponse,
 } from '@sport/shared/schemas/venues';
-import { VENUE_TYPES } from '@sport/shared';
+import { VENUE_TYPE_LABELS, VENUE_TYPES, type VenueType } from '@sport/shared';
 import type { venues } from '../../db/schema';
 
 export type VenueRow = typeof venues.$inferSelect;

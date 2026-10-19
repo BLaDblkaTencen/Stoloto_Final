@@ -3,17 +3,7 @@
 import { z } from 'zod';
 import { VENUE_TYPES, type VenueType } from '../enums';
 
-/** Подписи типов площадок из docs/DATA_MODEL.md. */
-export const VENUE_TYPE_LABELS: Record<VenueType, string> = {
-  cafe: 'Кафе',
-  club: 'Клуб',
-  field: 'Поле',
-  hall: 'Зал',
-  pool: 'Бассейн',
-  park: 'Парк',
-  yard: 'Двор',
-  other: 'Другое',
-};
+// Подписи типов площадок — VENUE_TYPE_LABELS в корне @sport/shared (labels.ts).
 
 /** Область карты: юго-запад и северо-восток. В запросе — bbox=minLng,minLat,maxLng,maxLat. */
 export type Bbox = { minLng: number; minLat: number; maxLng: number; maxLat: number };
