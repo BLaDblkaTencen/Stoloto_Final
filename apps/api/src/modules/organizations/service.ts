@@ -46,11 +46,12 @@ const alreadyExists = () =>
  */
 export async function resolvePublishingOrganization(
   user: SessionUser,
+  ex: Executor = db, // транзакция создания события, если вызывающий в ней
 ): Promise<{ organizationId: string; name: string }> {
   if (user.role !== 'organization') {
     throw errors.forbidden('Публиковать от имени организации может только аккаунт организации');
   }
-  return checkPublishing(await findByOwner(user.id));
+  return checkPublishing(await findByOwner(user.id, ex));
 }
 
 // ---------- Кабинет организации ----------

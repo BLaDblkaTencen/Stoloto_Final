@@ -43,7 +43,7 @@
 
 ```ts
 // apps/api/src/modules/organizations/service.ts — вызывает POST /api/events (участник 1)
-resolvePublishingOrganization(user: SessionUser): Promise<{ organizationId: string; name: string }>
+resolvePublishingOrganization(user: SessionUser, ex?: Db | Tx): Promise<{ organizationId: string; name: string }> // ex — транзакция создания события
 ```
 
 | Ситуация | Результат |
