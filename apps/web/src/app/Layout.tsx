@@ -1,7 +1,8 @@
 // Раскладка всех страниц: шапка, содержимое, подвал. Владелец: участник 3.
-// Пункты меню появятся вместе с экранами зон.
+// Пункты меню — в MainNav.tsx.
 import { Link, Outlet } from 'react-router';
 import { AccountMenu } from '../modules/auth/AccountMenu';
+import { MainNav } from './MainNav';
 
 export function Layout() {
   return (
@@ -16,6 +17,7 @@ export function Layout() {
           </span>
           <span className="font-display text-[26px] font-bold">вместе</span>
         </Link>
+        <MainNav />
         <AccountMenu />
       </header>
 

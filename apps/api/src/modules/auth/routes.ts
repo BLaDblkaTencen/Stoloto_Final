@@ -2,6 +2,7 @@
 // Регистрация, вход, выход, текущий пользователь (задача 3.2). Контракт — docs/api/core.md.
 import { loginBody, registerBody, type AuthResponse } from '@sport/shared/schemas/auth';
 import type { FastifyPluginAsync, FastifyRequest } from 'fastify';
+import { uniqueViolation } from '../../lib/db-errors';
 import { AppError, parse } from '../../lib/errors';
 import { hashPassword, verifyPassword } from './password';
 import {
@@ -71,7 +72,7 @@ const routes: FastifyPluginAsync = async (app) => {
       const user = await createUser({ ...body, passwordHash: await hashPassword(password) }).catch(
         (err: unknown) => {
           // Два одновременных запроса с одним email: второй упрётся в уникальный индекс.
-          throw isUniqueViolation(err) ? emailTaken() : err;
+          throw uniqueViolation(err) !== null ? emailTaken() : err;
         },
       );
 
@@ -96,10 +97,5 @@ const emailTaken = () =>
   new AppError(409, 'EMAIL_TAKEN', 'Этот email уже зарегистрирован. Войдите или укажите другой', {
     email: 'Этот email уже зарегистрирован',
   });
-
-function isUniqueViolation(err: unknown) {
-  const cause = err instanceof Error && 'cause' in err ? err.cause : err;
-  return typeof cause === 'object' && cause !== null && 'code' in cause && cause.code === '23505';
-}
 
 export default routes;
