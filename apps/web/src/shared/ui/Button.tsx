@@ -3,7 +3,7 @@
 import type { ButtonHTMLAttributes } from 'react';
 import { Link, type LinkProps } from 'react-router';
 
-type Variant = 'primary' | 'dark' | 'secondary' | 'danger';
+type Variant = 'primary' | 'dark' | 'secondary' | 'danger' | 'accent';
 type Size = 'md' | 'lg';
 
 // Тень — у каждого варианта своя, а не общим классом: два класса тени спорили бы между собой.
@@ -16,6 +16,8 @@ const VARIANTS: Record<Variant, string> = {
   dark: 'bg-ink text-white hover:text-white shadow-[2px_2px_0_var(--color-accent)] hover:shadow-[4px_4px_0_var(--color-accent)] disabled:shadow-[2px_2px_0_var(--color-accent)]',
   secondary: `bg-surface text-ink hover:text-ink ${INK_SHADOW}`,
   danger: `bg-danger text-danger-ink hover:text-danger-ink ${INK_SHADOW}`,
+  // Жёлтая — главное действие на тёмной полосе («Опубликовать встречу»), где синяя теряется.
+  accent: `bg-accent text-ink hover:text-ink ${INK_SHADOW}`,
 };
 
 const SIZES: Record<Size, string> = {

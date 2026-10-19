@@ -207,7 +207,12 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
 
   // После неудачной отправки — к первому полю с ошибкой: на длинной форме его может быть не видно.
   useEffect(() => {
-    if (attempt) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+    if (!attempt) return;
+    const field = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]');
+    // В середину экрана: внизу поле закрыла бы полоса «Опубликовать».
+    field?.focus({ preventScroll: true });
+    // Группу кнопок (вид спорта, день) — целиком: её ошибка стоит под последней кнопкой.
+    (field?.closest('fieldset') ?? field)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [attempt]);
 
   // Поле формы → под каким полем показана его ошибка (время — под датой, свой вид — под видом спорта).
@@ -272,12 +277,7 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
   const existing = customSlug ? sports.data?.find((sport) => sport.slug === customSlug) : undefined;
 
   return (
-    <form
-      ref={formRef}
-      onSubmit={submit}
-      noValidate
-      className="mx-auto flex max-w-3xl flex-col gap-6"
-    >
+    <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
         <Link to={event ? `/events/${event.id}` : '/'} className="self-start font-semibold">
           ← {event ? 'К событию' : 'Все встречи'}
@@ -303,148 +303,174 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
         <Alert>Проверьте поля, отмеченные ниже</Alert>
       )}
 
-      <Section title="Чем займёмся?">
-        {sports.isPending ? (
-          <Skeleton className="h-56 w-full" />
-        ) : (
-          <SportTiles
-            sports={sports.data ?? []}
-            value={form.sportId}
-            customValue={CUSTOM_SPORT}
-            onChange={set('sportId')}
-            error={form.sportId === CUSTOM_SPORT ? undefined : errors.sportId}
-          />
-        )}
-        {form.sportId === CUSTOM_SPORT && (
-          <TextField
-            label="Свой вид спорта"
-            placeholder="Например: Скандинавская ходьба"
-            hint={
-              existing
-                ? `«${existing.name}» уже есть в списке — встреча попадёт туда`
-                : form.sportName.trim()
-                  ? `Добавим в каталог как «${normalizeSportName(form.sportName)}»`
-                  : 'Новый вид спорта сразу появится в поиске и фильтрах'
-            }
-            value={form.sportName}
-            onChange={(e) => set('sportName')(e.target.value)}
-            error={errors.sportId}
-          />
-        )}
-        <TextField
-          label="Название"
-          placeholder="Например: Утренняя пробежка по острову"
-          maxLength={EVENT_LIMITS.title.max}
-          value={form.title}
-          onChange={(e) => set('title')(e.target.value)}
-          error={errors.title}
-        />
-        <TextareaField
-          label="Что будет на встрече"
-          hint="Что будете делать, в каком темпе, кому подойдёт"
-          rows={4}
-          maxLength={EVENT_LIMITS.description.max}
-          value={form.description}
-          onChange={(e) => set('description')(e.target.value)}
-          error={errors.description}
-        />
-      </Section>
+      {/*
+        На широком экране две колонки: слева что и когда, справа место с крупной картой и запись.
+        На узком колонки «растворяются» (contents), и блоки идут по порядку заполнения.
+      */}
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="flex min-w-0 flex-col gap-6 max-lg:contents">
+          <Section title="Чем займёмся?" className="max-lg:order-1">
+            {sports.isPending ? (
+              <Skeleton className="h-56 w-full" />
+            ) : (
+              <SportTiles
+                sports={sports.data ?? []}
+                value={form.sportId}
+                customValue={CUSTOM_SPORT}
+                onChange={set('sportId')}
+                error={form.sportId === CUSTOM_SPORT ? undefined : errors.sportId}
+              />
+            )}
+            {form.sportId === CUSTOM_SPORT && (
+              <TextField
+                label="Свой вид спорта"
+                placeholder="Например: Скандинавская ходьба"
+                hint={
+                  existing
+                    ? `«${existing.name}» уже есть в списке — встреча попадёт туда`
+                    : form.sportName.trim()
+                      ? `Добавим в каталог как «${normalizeSportName(form.sportName)}»`
+                      : 'Новый вид спорта сразу появится в поиске и фильтрах'
+                }
+                value={form.sportName}
+                onChange={(e) => set('sportName')(e.target.value)}
+                error={errors.sportId}
+              />
+            )}
+            <TextField
+              label="Название"
+              placeholder="Например: Утренняя пробежка по острову"
+              maxLength={EVENT_LIMITS.title.max}
+              value={form.title}
+              onChange={(e) => set('title')(e.target.value)}
+              error={errors.title}
+            />
+            <TextareaField
+              label="Что будет на встрече"
+              hint="Что будете делать, в каком темпе, кому подойдёт"
+              rows={4}
+              maxLength={EVENT_LIMITS.description.max}
+              value={form.description}
+              onChange={(e) => set('description')(e.target.value)}
+              error={errors.description}
+            />
+          </Section>
 
-      <Section title="Когда?" note={LOCAL_TIME_NOTE}>
-        <DayPicker value={form.date} onChange={set('date')} error={errors.date} />
-        <TimePicker value={form.startTime} onChange={set('startTime')} />
-        <TextField
-          label="Окончание"
-          hint="Необязательно"
-          type="time"
-          className="max-w-xs"
-          value={form.endTime}
-          onChange={(e) => set('endTime')(e.target.value)}
-          error={errors.endsAt}
-        />
-      </Section>
+          <Section title="Когда?" note={LOCAL_TIME_NOTE} className="max-lg:order-2">
+            <DayPicker value={form.date} onChange={set('date')} error={errors.date} />
+            <TimePicker value={form.startTime} onChange={set('startTime')} />
+            <TextField
+              label="Окончание"
+              hint="Необязательно"
+              type="time"
+              className="max-w-xs"
+              value={form.endTime}
+              onChange={(e) => set('endTime')(e.target.value)}
+              error={errors.endsAt}
+            />
+          </Section>
 
-      <Section title="Где?">
-        <MapPicker
-          sportId={form.sportId && form.sportId !== CUSTOM_SPORT ? form.sportId : undefined}
-          value={form.place}
-          onChange={choosePlace}
-          error={errors.venueId ?? errors.lat}
-        />
-        <TextField
-          label="Адрес или место"
-          hint={
-            form.place?.kind === 'venue'
-              ? 'Подставлен адрес площадки, можно уточнить'
-              : 'Так, чтобы человек нашёл без карты: улица и дом или понятное описание'
-          }
-          placeholder="Остров Татышев, главный вход"
-          maxLength={EVENT_LIMITS.address.max}
-          value={form.address}
-          onChange={(e) => set('address')(e.target.value)}
-          error={errors.address}
-        />
-        <TextField
-          label="Как найти"
-          hint="Необязательно: вход, этаж, ориентир"
-          placeholder="У информационного стенда"
-          maxLength={EVENT_LIMITS.placeNotes.max}
-          value={form.placeNotes}
-          onChange={(e) => set('placeNotes')(e.target.value)}
-          error={errors.placeNotes}
-        />
-      </Section>
-
-      <Section title="Как записываться?">
-        <JoinModeCards value={form.joinMode} onChange={set('joinMode')} error={errors.joinMode} />
-        <div className="flex flex-wrap gap-x-10 gap-y-5">
-          <SeatsField value={form.capacity} onChange={set('capacity')} error={errors.capacity} />
-          <fieldset className="flex min-w-0 flex-col">
-            <legend className="mb-2.5 font-semibold">Уровень подготовки</legend>
-            <div className="flex flex-wrap gap-2.5">
-              {EVENT_LEVELS.map((level, index) => (
-                <Chip
-                  key={level}
-                  index={index}
-                  pressed={form.level === level}
-                  onClick={() => set('level')(level)}
-                >
-                  {EVENT_LEVEL_LABELS[level]}
-                </Chip>
-              ))}
-            </div>
-          </fieldset>
+          <Section title="Что ещё знать участникам" note="Необязательно" className="max-lg:order-5">
+            <TextareaField
+              label="Условия участия"
+              hint="Что взять, какая нужна подготовка, есть ли инвентарь"
+              rows={3}
+              maxLength={EVENT_LIMITS.requirements.max}
+              value={form.requirements}
+              onChange={(e) => set('requirements')(e.target.value)}
+              error={errors.requirements}
+            />
+            <TextField
+              label="Ссылка на чат участников"
+              hint="Увидят только подтверждённые участники"
+              type="url"
+              placeholder="https://t.me/…"
+              value={form.chatUrl}
+              onChange={(e) => set('chatUrl')(e.target.value)}
+              error={errors.chatUrl}
+            />
+          </Section>
         </div>
-      </Section>
+        <div className="flex min-w-0 flex-col gap-6 max-lg:contents">
+          <Section title="Где?" className="max-lg:order-3">
+            <MapPicker
+              sportId={form.sportId && form.sportId !== CUSTOM_SPORT ? form.sportId : undefined}
+              value={form.place}
+              onChange={choosePlace}
+              error={errors.venueId ?? errors.lat}
+            />
+            <TextField
+              label="Адрес или место"
+              hint={
+                form.place?.kind === 'venue'
+                  ? 'Подставлен адрес площадки, можно уточнить'
+                  : 'Так, чтобы человек нашёл без карты: улица и дом или понятное описание'
+              }
+              placeholder="Остров Татышев, главный вход"
+              maxLength={EVENT_LIMITS.address.max}
+              value={form.address}
+              onChange={(e) => set('address')(e.target.value)}
+              error={errors.address}
+            />
+            <TextField
+              label="Как найти"
+              hint="Необязательно: вход, этаж, ориентир"
+              placeholder="У информационного стенда"
+              maxLength={EVENT_LIMITS.placeNotes.max}
+              value={form.placeNotes}
+              onChange={(e) => set('placeNotes')(e.target.value)}
+              error={errors.placeNotes}
+            />
+          </Section>
 
-      <Section title="Что ещё знать участникам" note="Необязательно">
-        <TextareaField
-          label="Условия участия"
-          hint="Что взять, какая нужна подготовка, есть ли инвентарь"
-          rows={3}
-          maxLength={EVENT_LIMITS.requirements.max}
-          value={form.requirements}
-          onChange={(e) => set('requirements')(e.target.value)}
-          error={errors.requirements}
-        />
-        <TextField
-          label="Ссылка на чат участников"
-          hint="Увидят только подтверждённые участники"
-          type="url"
-          placeholder="https://t.me/…"
-          value={form.chatUrl}
-          onChange={(e) => set('chatUrl')(e.target.value)}
-          error={errors.chatUrl}
-        />
-      </Section>
+          <Section title="Как записываться?" className="max-lg:order-4">
+            <JoinModeCards
+              value={form.joinMode}
+              onChange={set('joinMode')}
+              error={errors.joinMode}
+            />
+            <div className="flex flex-wrap gap-x-10 gap-y-5">
+              <SeatsField
+                value={form.capacity}
+                onChange={set('capacity')}
+                error={errors.capacity}
+              />
+              <fieldset className="flex min-w-0 flex-col">
+                <legend className="mb-2.5 font-semibold">Уровень подготовки</legend>
+                <div className="flex flex-wrap gap-2.5">
+                  {EVENT_LEVELS.map((level, index) => (
+                    <Chip
+                      key={level}
+                      index={index}
+                      pressed={form.level === level}
+                      onClick={() => set('level')(level)}
+                    >
+                      {EVENT_LEVEL_LABELS[level]}
+                    </Chip>
+                  ))}
+                </div>
+              </fieldset>
+            </div>
+          </Section>
+        </div>
+      </div>
 
-      <div className="flex flex-wrap gap-3">
-        <Button type="submit" size="lg" loading={saving}>
-          {saving ? 'Сохраняем…' : event ? 'Сохранить изменения' : 'Опубликовать встречу'}
-        </Button>
-        <ButtonLink to={event ? `/events/${event.id}` : '/'} variant="secondary" size="lg">
-          Отмена
-        </ButtonLink>
+      {/* На широком экране полоса прилипает к низу: кнопка видна, где бы человек ни был. На телефоне
+          она закрыла бы четверть экрана, поэтому стоит в конце формы. */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border-2 border-ink bg-ink lg:sticky lg:bottom-4 lg:z-[1100] px-5 py-4 text-white shadow-[4px_4px_0_var(--color-accent)]">
+        <p className="min-w-0 flex-[1_1_280px]">
+          {event
+            ? 'Участники увидят изменения сразу после сохранения.'
+            : 'Встреча появится в ленте и на карте сразу после публикации.'}
+        </p>
+        <div className="flex flex-wrap gap-3">
+          <ButtonLink to={event ? `/events/${event.id}` : '/'} variant="secondary" size="lg">
+            Отмена
+          </ButtonLink>
+          <Button type="submit" variant="accent" size="lg" loading={saving}>
+            {saving ? 'Сохраняем…' : event ? 'Сохранить изменения' : 'Опубликовать встречу'}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -480,9 +506,19 @@ function PublishAs() {
 }
 
 /** Блок формы: заголовок-вопрос и, справа, короткая пометка. */
-function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+function Section({
+  title,
+  note,
+  className = '',
+  children,
+}: {
+  title: string;
+  note?: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
-    <Card className="flex flex-col gap-6">
+    <Card className={`flex min-w-0 flex-col gap-6 ${className}`}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-h3">{title}</h2>
         {note && <span className="text-sm text-ink-muted">{note}</span>}
