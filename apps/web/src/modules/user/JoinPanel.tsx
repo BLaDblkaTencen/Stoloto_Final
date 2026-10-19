@@ -1,5 +1,6 @@
 // Блок записи на странице события. Что показать, решает сервер (permissions, joinBlock,
-// myRegistration): интерфейс не дублирует правила и не расходится с ними.
+// myRegistration): интерфейс не дублирует правила и не расходится с ними. Организатор
+// управляет событием в панели организатора, блок записи ему не показывается.
 import { REGISTRATION_MESSAGE_MAX } from '@sport/shared/schemas/registrations';
 import type { EventDetails } from '@sport/shared/schemas/events';
 import { useState } from 'react';
@@ -38,23 +39,8 @@ export function JoinPanel({ event }: { event: EventDetails }) {
   const byRequest = event.joinMode === 'request';
   const error = join.error ?? cancel.error;
 
-  if (permissions.isOrganizer) {
-    return (
-      <Card tone="accent" className="flex flex-col gap-2">
-        <h2 className="text-h3">Вы организатор</h2>
-        <p>
-          {byRequest
-            ? 'Люди подают заявки, вы принимаете или отклоняете их.'
-            : 'Люди записываются сразу, без вашего подтверждения.'}
-        </p>
-        {permissions.canEdit && (
-          <ButtonLink to={`/events/${event.id}/edit`} variant="secondary" className="self-start">
-            Изменить встречу
-          </ButtonLink>
-        )}
-      </Card>
-    );
-  }
+  // Организатору вместо блока записи — панель организатора (участник 2) над карточкой.
+  if (permissions.isOrganizer) return null;
 
   const cancelLabel = my?.status === 'pending' ? 'Отозвать заявку' : 'Отменить запись';
 

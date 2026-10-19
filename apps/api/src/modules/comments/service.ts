@@ -1,7 +1,7 @@
 // Обсуждение под мероприятием (задача 1.8, сценарий 5 ТЗ). Владелец: участник 1.
 // Ответ организатора — обычный комментарий с parentId, отдельной сущности нет (DATA_MODEL).
 // Скрывает сообщения модуль admin (участник 3); здесь скрытый текст просто не отдаём.
-import type { Comment, CommentAuthor } from '@sport/shared/schemas/comments';
+import type { Comment } from '@sport/shared/schemas/comments';
 import { and, asc, eq } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { comments, events, organizations, registrations, users } from '../../db/schema';
@@ -9,6 +9,7 @@ import { AppError } from '../../lib/errors';
 import type { SessionUser } from '../auth/session';
 import { canSeeEvent, type Viewer } from '../events/rules';
 import { eventHidden, eventNotFound } from '../events/service';
+import { buildThread, toComment } from './thread';
 
 /** Событие с тем, что нужно обсуждению: видимость, автор и название организации для плашки. */
 async function loadEvent(eventId: string, viewer: Viewer) {
@@ -37,17 +38,6 @@ async function loadEvent(eventId: string, viewer: Viewer) {
   return event;
 }
 
-type Row = {
-  id: string;
-  parentId: string | null;
-  text: string;
-  isHidden: boolean;
-  createdAt: Date;
-  authorId: string;
-  authorName: string;
-  authorRole: SessionUser['role'];
-};
-
 const rowColumns = {
   id: comments.id,
   parentId: comments.parentId,
@@ -59,34 +49,6 @@ const rowColumns = {
   authorRole: users.role,
 };
 
-function author(
-  row: Row,
-  event: { createdBy: string; organizationName: string | null },
-): CommentAuthor {
-  const base = { id: row.authorId, name: row.authorName };
-  if (row.authorId === event.createdBy) {
-    return { ...base, badge: 'organizer', badgeLabel: event.organizationName ?? 'Организатор' };
-  }
-  if (row.authorRole === 'admin') return { ...base, badge: 'moderator', badgeLabel: 'Модератор' };
-  return { ...base, badge: null, badgeLabel: null };
-}
-
-function toComment(
-  row: Row,
-  event: { createdBy: string; organizationName: string | null },
-): Comment {
-  return {
-    id: row.id,
-    parentId: row.parentId,
-    author: author(row, event),
-    // Текст скрытого сообщения не уходит из API вовсе, а не только прячется в интерфейсе.
-    text: row.isHidden ? null : row.text,
-    isHidden: row.isHidden,
-    createdAt: row.createdAt.toISOString(),
-    replies: [],
-  };
-}
-
 /** Обсуждение события: первые сообщения веток по времени, в каждом — ответы по времени. */
 export async function listComments(eventId: string, viewer: Viewer): Promise<Comment[]> {
   const event = await loadEvent(eventId, viewer);
@@ -96,19 +58,7 @@ export async function listComments(eventId: string, viewer: Viewer): Promise<Com
     .innerJoin(users, eq(users.id, comments.authorId))
     .where(eq(comments.eventId, eventId))
     .orderBy(asc(comments.createdAt), asc(comments.id));
-
-  const roots: Comment[] = [];
-  const byId = new Map<string, Comment>();
-  for (const row of rows) {
-    const comment = toComment(row, event);
-    const parent = row.parentId ? byId.get(row.parentId) : undefined;
-    if (parent) parent.replies.push(comment);
-    else {
-      roots.push(comment);
-      byId.set(comment.id, comment);
-    }
-  }
-  return roots;
+  return buildThread(rows, event);
 }
 
 /** Написать вопрос или ответ. Писать может любой вошедший, в том числе не записанный (ТЗ). */

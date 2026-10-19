@@ -1,14 +1,16 @@
-// Запросы зоны «Пользователь»: виды спорта, мероприятия, запись. Контракт — docs/api/events.md.
-// Ключи кэша начинаются с 'events' и 'registrations': после записи или отмены обновляем оба,
-// чтобы лента, карточка и «Мои записи» сразу показывали новый статус.
+// Запросы зоны «Пользователь»: виды спорта, мероприятия, запись, обсуждение, профиль.
+// Контракт — docs/api/events.md. Ключи кэша начинаются с 'events' и 'registrations': после записи
+// или отмены обновляем оба, чтобы лента, карточка и «Мои записи» сразу показывали новый статус.
 import type {
   EventDetails,
   EventInput,
   EventListItem,
   ListResponse,
+  MyEventItem,
   MyRegistration,
 } from '@sport/shared/schemas/events';
 import type { Comment, CommentInput } from '@sport/shared/schemas/comments';
+import type { ProfileInput, UserProfile } from '@sport/shared/schemas/profiles';
 import type { MyRegistrationItem } from '@sport/shared/schemas/registrations';
 import type { Sport } from '@sport/shared/schemas/sports';
 import {
@@ -19,6 +21,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import { api } from '../../shared/api/client';
+import { meQueryKey } from '../auth/api';
 
 /** Параметры ленты, как в адресе страницы и в запросе к API. */
 export type FeedParams = {
@@ -79,13 +82,45 @@ export function useEvent(id: string) {
   });
 }
 
-/** Ближайшие записи для блока «Мои записи» на главной. */
-export function useMyRegistrations(enabled: boolean, limit = 3) {
+export type Scope = 'upcoming' | 'past';
+
+/** Мои записи: ближайшие для блока на главной или все на странице «Мои мероприятия». */
+export function useMyRegistrations(enabled: boolean, limit = 3, scope: Scope = 'upcoming') {
   return useQuery({
-    queryKey: ['registrations', 'mine', { limit }],
+    queryKey: ['registrations', 'mine', { limit, scope }],
     queryFn: () =>
-      api<ListResponse<MyRegistrationItem>>(`/registrations/mine${toQuery({ limit })}`),
+      api<ListResponse<MyRegistrationItem>>(`/registrations/mine${toQuery({ limit, scope })}`),
     enabled,
+  });
+}
+
+/** События, которые я организую, со счётчиком новых заявок. */
+export function useMyEvents(enabled: boolean, scope: Scope = 'upcoming') {
+  return useQuery({
+    queryKey: ['events', 'mine', { scope }],
+    queryFn: () => api<ListResponse<MyEventItem>>(`/events/mine${toQuery({ scope, limit: 50 })}`),
+    enabled,
+  });
+}
+
+export function useProfile(id: string) {
+  return useQuery({
+    queryKey: ['profiles', id],
+    queryFn: () => api<UserProfile>(`/users/${id}`),
+  });
+}
+
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ProfileInput) =>
+      api<UserProfile>('/users/me', { method: 'PATCH', json: body }),
+    onSuccess: (profile) => {
+      queryClient.setQueryData(['profiles', profile.id], profile);
+      // Имя в шапке берётся из /auth/me.
+      void queryClient.invalidateQueries({ queryKey: meQueryKey });
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
   });
 }
 

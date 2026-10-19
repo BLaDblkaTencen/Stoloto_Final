@@ -15,7 +15,10 @@ import {
   JoinModeBadge,
   Skeleton,
   SkeletonList,
+  VenueCard,
 } from '../../shared/ui';
+import { PlaceMap, venueCardData } from '../org/map';
+import { OrganizerPanel } from '../org/panel/OrganizerPanel';
 import { useEvent } from './api';
 import { MetaLine, OrganizerLink, SportTile } from './EventBits';
 import { formatSeats, formatWhen, LOCAL_TIME_NOTE } from './format';
@@ -66,6 +69,8 @@ function EventView({ event }: { event: EventDetails }) {
         </Alert>
       )}
 
+      {event.permissions.isOrganizer && <OrganizerPanel event={event} />}
+
       {/* На телефоне: описание → запись → обсуждение; на широком экране запись справа на всю высоту. */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
         <Card className="flex flex-col gap-6">
@@ -92,7 +97,22 @@ function EventView({ event }: { event: EventDetails }) {
               {event.address}
               {event.placeNotes && <span className="block">{event.placeNotes}</span>}
             </MetaLine>
-            {event.venue && <VenueInfo venue={event.venue} />}
+            {/* «Место встречи» (1.10): площадка с контактом администратора и метка на карте. */}
+            {event.venue && (
+              <div className="mt-2">
+                <VenueCard venue={venueCardData(event.venue)} />
+              </div>
+            )}
+            {event.lat !== null && event.lng !== null && (
+              <div className="mt-2">
+                <PlaceMap
+                  lat={event.lat}
+                  lng={event.lng}
+                  title={event.venue?.name ?? event.address}
+                  venueType={event.venue?.type}
+                />
+              </div>
+            )}
           </section>
 
           <section className="flex flex-col gap-2">
@@ -120,21 +140,6 @@ function EventView({ event }: { event: EventDetails }) {
           <Discussion event={event} />
         </div>
       </div>
-    </div>
-  );
-}
-
-function VenueInfo({ venue }: { venue: NonNullable<EventDetails['venue']> }) {
-  return (
-    <div className="mt-2 flex flex-col gap-1 rounded-md border-2 border-ink bg-surface-muted p-4">
-      <p className="font-semibold">{venue.name}</p>
-      {venue.workingHours && <p className="text-sm">Часы работы: {venue.workingHours}</p>}
-      {venue.contact && (
-        <p className="text-sm">
-          Договориться: {[venue.contact.name, venue.contact.phone].filter(Boolean).join(', ')}
-          {venue.contact.note && <span className="block text-ink-muted">{venue.contact.note}</span>}
-        </p>
-      )}
     </div>
   );
 }
