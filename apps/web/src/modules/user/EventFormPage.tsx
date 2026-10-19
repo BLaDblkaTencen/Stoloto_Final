@@ -18,7 +18,8 @@ import {
 } from '@sport/shared/schemas/events';
 import { sportSlug } from '@sport/shared/schemas/sports';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import type { VenueCard as VenueInfo } from '@sport/shared/schemas/venues';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import {
   Alert,
   Button,
@@ -37,7 +38,7 @@ import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { useMyOrganization } from '../org/api';
 import { formErrors, useFreshErrors } from '../org/errors';
-import { MapPicker, type PlaceValue } from '../org/map';
+import { MapPicker, useVenue, type PlaceValue } from '../org/map';
 import { useEvent, useSaveEvent, useSports } from './api';
 import { isoDay, isoToZoned, LOCAL_TIME_NOTE, zonedToIso } from './format';
 
@@ -93,17 +94,20 @@ type FormState = {
   chatUrl: string;
 };
 
-function initialState(event?: EventDetails): FormState {
+/** Заготовка новой встречи: «Создать встречу здесь» с карты передаёт площадку и вид спорта. */
+type Preset = { venue?: VenueInfo; sportId?: string };
+
+function initialState(event?: EventDetails, preset: Preset = {}): FormState {
   if (!event) {
     return {
       title: '',
-      sport: '',
+      sport: preset.sportId ?? '',
       sportName: '',
       day: isoDay(1),
       time: '10:00',
       endTime: '',
-      place: null,
-      address: '',
+      place: preset.venue ? { kind: 'venue', venue: preset.venue } : null,
+      address: preset.venue?.address ?? '',
       placeNotes: '',
       description: '',
       requirements: '',
@@ -173,9 +177,19 @@ function toBody(form: FormState): Partial<EventInput> {
 export function CreateEventRoute() {
   return (
     <RequireAuth roles={['user', 'organization']}>
-      <EventFormScreen />
+      <CreateEventScreen />
     </RequireAuth>
   );
+}
+
+/** /events/new?venue=…&sport=… — площадка и вид спорта уже выбраны (кнопка в попапе карты). */
+function CreateEventScreen() {
+  const [search] = useSearchParams();
+  const venue = useVenue(search.get('venue'));
+  const sportId = search.get('sport') ?? undefined;
+  if (venue.isLoading) return <SkeletonList count={3} />;
+  // Площадку не нашли — просто пустая форма: место выберут на карте.
+  return <EventFormScreen preset={{ venue: venue.data, sportId }} />;
 }
 
 export function EditEventRoute() {
@@ -204,12 +218,12 @@ function EditEventScreen() {
   return <EventFormScreen event={event.data} />;
 }
 
-function EventFormScreen({ event }: { event?: EventDetails }) {
+function EventFormScreen({ event, preset }: { event?: EventDetails; preset?: Preset }) {
   const navigate = useNavigate();
   const me = useMe();
   const isOrganization = me.data?.role === 'organization';
   const save = useSaveEvent(event?.id);
-  const [form, setForm] = useState(() => initialState(event));
+  const [form, setForm] = useState(() => initialState(event, preset));
   const [clientFields, setClientFields] = useState<Record<string, string>>({});
   const server = formErrors(save.error, 'Не получилось сохранить. Попробуйте ещё раз');
   const fresh = useFreshErrors(Object.keys(clientFields).length > 0 ? clientFields : server.fields);
