@@ -223,6 +223,7 @@ type Comment = {
 | Метод | Путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/users/:id` | все | — | `{ id, name, about, city, sports: Sport[], upcomingEvents: EventListItem[] }` — события, которые человек организует | 404 `USER_NOT_FOUND` |
+| GET | `/api/users/me` | вошедший | — | свой профиль, как в `GET /api/users/:id` (для формы правки) | 401 |
 | PATCH | `/api/users/me` | вошедший | `{ name?, about?, city?, sportIds?: string[] }` | профиль как в `GET /api/users/:id` | 401; 422 |
 
 Email и пароль здесь не меняются (вход — модуль `auth`, участник 3).
