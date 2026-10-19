@@ -1,13 +1,7 @@
 // Организации. Владелец: участник 2. Формы запросов и ответов для сервера и интерфейса.
+// Подписи статусов заявки — ORG_STATUS_LABELS в корне @sport/shared (labels.ts).
 import { z } from 'zod';
 import type { OrgStatus } from '../enums';
-
-/** Подписи статусов заявки из docs/DATA_MODEL.md. */
-export const ORG_STATUS_LABELS: Record<OrgStatus, string> = {
-  pending: 'На рассмотрении',
-  approved: 'Допущена',
-  rejected: 'Отклонена',
-};
 
 /** Название без лишних пробелов; регистр сохраняется. */
 export const normalizeOrgName = (name: string) => name.trim().replace(/\s+/g, ' ');
