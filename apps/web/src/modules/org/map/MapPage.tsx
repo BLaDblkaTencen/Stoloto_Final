@@ -1,4 +1,5 @@
-// Страница /map «Встречи на карте»: показ киллер-фичи отдельно от ленты.
+// Страница /map «Встречи на карте»: киллер-фича отдельно от ленты. Встречи и, по желанию,
+// площадки с контактами: с карты можно сразу создать встречу на выбранной площадке.
 import { JOIN_MODES, JOIN_MODE_LABELS, type JoinMode } from '@sport/shared';
 import { useSearchParams } from 'react-router';
 import { Chip, SportChip } from '../../../shared/ui';
@@ -9,6 +10,7 @@ export function MapPage() {
   const [params, setParams] = useSearchParams();
   const sportId = params.get('sport') ?? undefined;
   const joinMode = (params.get('mode') as JoinMode | null) ?? undefined;
+  const showVenues = params.get('venues') === '1';
   const sports = useSports();
 
   const toggle = (key: string, value: string, current: string | undefined) => {
@@ -25,6 +27,12 @@ export function MapPage() {
         <p className="text-ink-muted">
           Метка — встреча, цвет — вид спорта, замок — запись по заявке. Нажмите на метку, чтобы
           увидеть подробности.
+          {showVenues &&
+            `${
+              sportId
+                ? ' Круглые метки — площадки, жёлтые подходят этому виду спорта.'
+                : ' Круглые метки — площадки: кафе, клубы, поля и парки.'
+            } В карточке площадки — с кем договориться и какие встречи там уже проходят.`}
         </p>
       </div>
 
@@ -39,7 +47,7 @@ export function MapPage() {
           />
         ))}
       </div>
-      <div className="flex flex-wrap gap-2.5" aria-label="Режим записи">
+      <div className="flex flex-wrap gap-2.5" aria-label="Режим записи и площадки">
         {JOIN_MODES.map((mode) => (
           <Chip
             key={mode}
@@ -50,9 +58,21 @@ export function MapPage() {
             {JOIN_MODE_LABELS[mode]}
           </Chip>
         ))}
+        <Chip
+          pressed={showVenues}
+          icon="house"
+          index={2}
+          onClick={() => toggle('venues', '1', showVenues ? '1' : undefined)}
+        >
+          Площадки
+        </Chip>
       </div>
 
-      <EventsMap filters={{ sportId, joinMode }} className="h-[60vh] min-h-[420px]" />
+      <EventsMap
+        filters={{ sportId, joinMode }}
+        showVenues={showVenues}
+        className="h-[60vh] min-h-[420px]"
+      />
     </div>
   );
 }

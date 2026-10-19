@@ -3,11 +3,7 @@
 // участника 1: видна только автору события (permissions.isOrganizer).
 //
 //   {event.permissions.isOrganizer && <OrganizerPanel event={event} />}
-import {
-  REGISTRATION_STATUS_LABELS,
-  REGISTRATION_STATUSES,
-  type RegistrationStatus,
-} from '@sport/shared';
+import { REGISTRATION_STATUSES, type RegistrationStatus } from '@sport/shared';
 import type { EventDetails } from '@sport/shared/schemas/events';
 import type { OrganizerRegistration } from '@sport/shared/schemas/registrations';
 import { useState } from 'react';
@@ -17,6 +13,7 @@ import { formatDateTime } from '../../../shared/format';
 import {
   Alert,
   Avatar,
+  Badge,
   Button,
   ButtonLink,
   Card,
@@ -24,7 +21,6 @@ import {
   ErrorState,
   Modal,
   SkeletonList,
-  StatusBadge,
 } from '../../../shared/ui';
 import { useDecideRegistration, useEventRegistrations } from './api';
 
@@ -33,6 +29,23 @@ const TAB_LABELS: Record<RegistrationStatus, string> = {
   confirmed: 'Участники',
   rejected: 'Отклонённые',
   cancelled: 'Отменили',
+};
+
+// Подписи со стороны организатора: общие REGISTRATION_STATUS_LABELS написаны для участника
+// («Вы записаны»), здесь они звучали бы так, будто записан сам организатор.
+const STATUS_BADGE: Record<
+  RegistrationStatus,
+  { tone: 'success' | 'warning' | 'danger' | 'neutral'; label: string }
+> = {
+  confirmed: { tone: 'success', label: 'Участвует' },
+  pending: { tone: 'warning', label: 'Ждёт решения' },
+  rejected: { tone: 'danger', label: 'Заявка отклонена' },
+  cancelled: { tone: 'neutral', label: 'Запись отменена' },
+};
+
+const DECIDED: Partial<Record<RegistrationStatus, string>> = {
+  confirmed: 'принята',
+  rejected: 'отклонена',
 };
 
 const EMPTY_TEXT: Record<RegistrationStatus, string> = {
@@ -115,14 +128,16 @@ export function OrganizerPanel({ event }: { event: EventDetails }) {
                     <Link to={`/users/${item.user.id}`} className="font-semibold">
                       {item.user.name}
                     </Link>
-                    <StatusBadge kind="registration" status={item.status} />
+                    <Badge tone={STATUS_BADGE[item.status].tone}>
+                      {STATUS_BADGE[item.status].label}
+                    </Badge>
                   </p>
                   <p className="text-sm text-ink-muted">
                     {item.status === 'pending' ? 'Заявка от ' : 'Запись от '}
                     {formatDateTime(item.createdAt)}
                     {item.decidedAt &&
-                      (item.status === 'confirmed' || item.status === 'rejected') &&
-                      ` · ${REGISTRATION_STATUS_LABELS[item.status].toLowerCase()} ${formatDateTime(item.decidedAt)}`}
+                      DECIDED[item.status] &&
+                      ` · ${DECIDED[item.status]} ${formatDateTime(item.decidedAt)}`}
                   </p>
                   {item.user.about && <p className="text-sm">{item.user.about}</p>}
                   {item.message && (

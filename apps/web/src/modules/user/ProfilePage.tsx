@@ -27,7 +27,7 @@ import {
 } from '../../shared/ui';
 import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
-import { formErrors } from '../org/errors';
+import { formErrors, useFreshErrors } from '../org/errors';
 import { useProfile, useSports, useUpdateProfile } from './api';
 import { EventCard } from './EventCard';
 
@@ -135,17 +135,22 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
   const [sportIds, setSportIds] = useState(profile.sports.map((sport) => sport.id));
   const [clientFields, setClientFields] = useState<Record<string, string>>({});
   const server = formErrors(save.error, 'Не получилось сохранить. Попробуйте ещё раз');
-  const fields = Object.keys(clientFields).length > 0 ? clientFields : server.fields;
+  const fresh = useFreshErrors(Object.keys(clientFields).length > 0 ? clientFields : server.fields);
 
-  const set = (key: keyof typeof form) => (value: string) =>
+  const set = (key: keyof typeof form) => (value: string) => {
+    fresh.edit(key);
     setForm((current) => ({ ...current, [key]: value }));
-  const toggleSport = (id: string) =>
+  };
+  const toggleSport = (id: string) => {
+    fresh.edit('sportIds');
     setSportIds((current) =>
       current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
     );
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    fresh.reset();
     const body = { ...form, sportIds };
     const parsed = updateProfileSchema.safeParse(body);
     if (!parsed.success) return setClientFields(zodFieldErrors(parsed.error));
@@ -169,7 +174,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             maxLength={PROFILE_LIMITS.name.max}
             value={form.name}
             onChange={(e) => set('name')(e.target.value)}
-            error={fields.name}
+            error={fresh.errorOf('name')}
           />
           <TextField
             label="Город"
@@ -178,7 +183,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             maxLength={PROFILE_LIMITS.city.max}
             value={form.city}
             onChange={(e) => set('city')(e.target.value)}
-            error={fields.city}
+            error={fresh.errorOf('city')}
           />
           <TextareaField
             label="О себе"
@@ -187,7 +192,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
             maxLength={PROFILE_LIMITS.about.max}
             value={form.about}
             onChange={(e) => set('about')(e.target.value)}
-            error={fields.about}
+            error={fresh.errorOf('about')}
           />
           <fieldset className="flex flex-col gap-2">
             <legend className="mb-1.5 font-semibold">Интересы</legend>
@@ -206,7 +211,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
                 ))}
               </div>
             )}
-            {fields.sportIds && <FieldError>{fields.sportIds}</FieldError>}
+            {fresh.errorOf('sportIds') && <FieldError>{fresh.errorOf('sportIds')}</FieldError>}
           </fieldset>
           <div className="flex flex-wrap gap-3">
             <Button type="submit" size="lg" loading={save.isPending}>

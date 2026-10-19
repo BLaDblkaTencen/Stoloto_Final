@@ -18,7 +18,7 @@ import {
 } from '@sport/shared/schemas/events';
 import { normalizeSportName, sportSlug } from '@sport/shared/schemas/sports';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
   Alert,
@@ -37,7 +37,7 @@ import {
 import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { useMyOrganization } from '../org/api';
-import { MapPicker, type PlaceValue } from '../org/map';
+import { MapPicker, useVenue, type PlaceValue } from '../org/map';
 import { useCreateEvent, useEvent, useSports, useUpdateEvent } from './api';
 import { isoDay, localParts, LOCAL_TIME_NOTE, toUtcIso } from './format';
 
@@ -142,9 +142,28 @@ function toFormErrors(fields: Record<string, string>): Record<string, string> {
 export function CreateEventPage() {
   return (
     <RequireAuth roles={['user', 'organization']}>
-      <EventForm initial={EMPTY} />
+      <CreateLoader />
     </RequireAuth>
   );
+}
+
+/**
+ * /events/new?venue=…&sport=… — «Создать встречу здесь» из попапа площадки на карте (участник 2):
+ * площадка, её адрес и вид спорта уже выбраны. Площадку не нашли — обычная пустая форма.
+ */
+function CreateLoader() {
+  const [search] = useSearchParams();
+  const venue = useVenue(search.get('venue'));
+  if (venue.isLoading) return <SkeletonList count={2} />;
+  const initial: FormState = {
+    ...EMPTY,
+    sportId: search.get('sport') ?? '',
+    ...(venue.data && {
+      place: { kind: 'venue', venue: venue.data },
+      address: venue.data.address,
+    }),
+  };
+  return <EventForm initial={initial} />;
 }
 
 export function EditEventPage() {
