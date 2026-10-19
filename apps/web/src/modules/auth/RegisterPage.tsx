@@ -4,13 +4,13 @@ import { registerBody, type RegisterBody } from '@sport/shared/schemas/auth';
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
-import { Alert, Button, Card, FieldError, TextField } from '../../shared/ui';
+import { Alert, Button, Card, RadioCards, TextField } from '../../shared/ui';
 import { safeNext, useMe, useRegister } from './api';
 
-const ACCOUNT_TYPES: { role: RegisterBody['role']; title: string; text: string }[] = [
-  { role: 'user', title: 'Я участник', text: 'Ищу компанию для спорта и создаю свои встречи' },
+const ACCOUNT_TYPES: { value: RegisterBody['role']; title: string; text: string }[] = [
+  { value: 'user', title: 'Я участник', text: 'Ищу компанию для спорта и создаю свои встречи' },
   {
-    role: 'organization',
+    value: 'organization',
     title: 'Я представляю организацию',
     text: 'Клуб, кружок, федерация. После регистрации подам заявку на допуск',
   },
@@ -56,32 +56,13 @@ export function RegisterPage() {
       <form onSubmit={submit} noValidate className="flex flex-col gap-5">
         {requestError && <Alert>{requestError}</Alert>}
 
-        <fieldset className="flex flex-col gap-3">
-          <legend className="mb-1.5 font-semibold">Тип аккаунта</legend>
-          {ACCOUNT_TYPES.map((type) => (
-            <label
-              key={type.role}
-              className={[
-                'flex cursor-pointer items-start gap-3 rounded-md border-2 border-ink p-4',
-                form.role === type.role ? 'bg-accent shadow-sm' : 'bg-surface',
-              ].join(' ')}
-            >
-              <input
-                type="radio"
-                name="role"
-                value={type.role}
-                checked={form.role === type.role}
-                onChange={(e) => set('role')(e.target.value)}
-                className="mt-1 size-5 shrink-0 accent-ink"
-              />
-              <span>
-                <span className="block font-semibold">{type.title}</span>
-                <span className="text-sm text-ink-muted">{type.text}</span>
-              </span>
-            </label>
-          ))}
-          {fields.role && <FieldError>{fields.role}</FieldError>}
-        </fieldset>
+        <RadioCards
+          legend="Тип аккаунта"
+          options={ACCOUNT_TYPES}
+          value={form.role as RegisterBody['role'] | ''}
+          onChange={set('role')}
+          error={fields.role}
+        />
 
         <TextField
           label="Имя"

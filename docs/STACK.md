@@ -10,7 +10,7 @@
 | Язык | TypeScript везде | Apache-2.0 |
 | Среда выполнения | Node.js LTS, менеджер пакетов pnpm (workspaces) | MIT |
 | Фронтенд | React + Vite | MIT |
-| Стили и компоненты | Tailwind CSS + shadcn/ui (на Radix UI) | MIT |
+| Стили и компоненты | Tailwind CSS + свои компоненты `shared/ui` на системных элементах (см. docs/design/README.md) | MIT |
 | Роутинг | React Router | MIT |
 | Данные на клиенте | TanStack Query | MIT |
 | Карта | Leaflet + react-leaflet + leaflet.markercluster, плитки OpenStreetMap | BSD-2 / MIT, данные ODbL |

@@ -1,10 +1,12 @@
-// Аватар с инициалами вместо фото: «Иван Петров» → «ИП».
+// Аватар с инициалами вместо фото: «Иван Петров» → «ИП», «Клуб «Е2–Е4»» → «КЕ».
 export function initials(name: string) {
+  // Первая буква или цифра каждого слова: кавычки, тире и скобки пропускаем.
   const letters = name
-    .trim()
     .split(/\s+/)
+    .map((word) => word.match(/[\p{L}\p{N}]/u)?.[0])
+    .filter(Boolean)
     .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? '');
+    .map((letter) => letter!.toUpperCase());
   return letters.join('') || '?';
 }
 
