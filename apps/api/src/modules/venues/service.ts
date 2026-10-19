@@ -56,10 +56,16 @@ export async function listVenues(query: VenuesQuery): Promise<{ items: Venue[] }
   return { items: searchVenues(rows, query, sportTypesFor(links, query.sportId)) };
 }
 
-export async function getVenue(id: string): Promise<VenueCard> {
+/** Площадка по id; null, если такой нет (в том числе для id не в формате UUID). */
+export async function findVenueCard(id: string): Promise<VenueCard | null> {
   const row = z.uuid().safeParse(id).success ? (await loadCatalog()).byId.get(id) : undefined;
-  if (!row) throw venueNotFound();
-  return toVenueCard(row);
+  return row ? toVenueCard(row) : null;
+}
+
+export async function getVenue(id: string): Promise<VenueCard> {
+  const venue = await findVenueCard(id);
+  if (!venue) throw venueNotFound();
+  return venue;
 }
 
 export async function getVenueTypes(): Promise<VenueTypesResponse> {
@@ -71,12 +77,10 @@ export async function getVenueTypes(): Promise<VenueTypesResponse> {
  * Неизвестная площадка — 422 VENUE_NOT_FOUND с ошибкой поля формы venueId.
  */
 export async function resolveVenueForEvent(venueId: string): Promise<VenueCard> {
-  const row = z.uuid().safeParse(venueId).success
-    ? (await loadCatalog()).byId.get(venueId)
-    : undefined;
-  if (!row) {
+  const venue = await findVenueCard(venueId);
+  if (!venue) {
     const message = 'Площадка не найдена, выберите другую на карте';
     throw new AppError(422, 'VENUE_NOT_FOUND', message, { venueId: message });
   }
-  return toVenueCard(row);
+  return venue;
 }
