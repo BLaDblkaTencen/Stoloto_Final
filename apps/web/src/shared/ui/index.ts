@@ -10,6 +10,7 @@ export { Chip, SportChip } from './Chip';
 export { controlClass, FieldShell } from './Field';
 export { FieldError } from './FieldError';
 export { Icon, ICON_PATHS, type IconName } from './Icon';
+export { Listbox, type ListboxOption } from './Listbox';
 export { Modal } from './Modal';
 export { RadioCards } from './RadioCards';
 export { SelectField } from './SelectField';

@@ -29,7 +29,8 @@ export function FieldShell({
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label htmlFor={controlId} className="font-semibold">
+      {/* id подписи — для списков (Listbox): у них подпись связана через aria-labelledby. */}
+      <label id={`${controlId}-label`} htmlFor={controlId} className="font-semibold">
         {label}
       </label>
       {children({

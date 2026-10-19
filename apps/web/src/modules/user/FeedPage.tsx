@@ -3,7 +3,7 @@
 // Фильтры живут в адресе страницы: ссылкой на подборку можно поделиться, «Назад» возвращает фильтр.
 import { EVENT_LEVEL_LABELS, EVENT_LEVELS, JOIN_MODE_LABELS, JOIN_MODES } from '@sport/shared';
 import type { EventListItem } from '@sport/shared/schemas/events';
-import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
+import { useId, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
@@ -14,6 +14,7 @@ import {
   ErrorState,
   Icon,
   JoinModeBadge,
+  Listbox,
   SelectField,
   SkeletonList,
   SportChip,
@@ -163,6 +164,7 @@ function SearchForm({
 }) {
   const [text, setText] = useState(q);
   const [where, setWhere] = useState(place);
+  const whenLabelId = useId();
   const submit = (event: FormEvent) => {
     event.preventDefault();
     onSearch({ q: text.trim() || undefined, place: where.trim() || undefined });
@@ -192,20 +194,15 @@ function SearchForm({
             className="min-w-0 bg-transparent py-0.5 text-lg outline-none placeholder:text-ink-muted"
           />
         </SearchField>
-        <SearchField label="Когда" divider>
+        <SearchField label="Когда" labelId={whenLabelId} divider>
           {/* Дата применяется сразу: выбор из списка не требует «Найти». */}
-          <select
+          <Listbox
+            aria-labelledby={whenLabelId}
             value={when}
-            onChange={(e) => onSearch({ when: e.target.value || undefined })}
-            className="min-w-0 cursor-pointer bg-transparent py-0.5 text-lg outline-none"
-          >
-            <option value="">Любая дата</option>
-            {WHEN_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: 'Любая дата' }, ...WHEN_OPTIONS]}
+            onChange={(next) => onSearch({ when: next || undefined })}
+            triggerClassName="py-0.5 text-lg outline-none"
+          />
         </SearchField>
       </div>
       <Button type="submit" size="lg" className="self-start">
@@ -219,25 +216,32 @@ function SearchForm({
 /** Поле поиска: подпись над ним, между полями — пунктир (на телефоне сверху, на широком — слева). */
 function SearchField({
   label,
+  labelId,
   divider = false,
   children,
 }: {
   label: string;
+  /** Для списка «Когда»: подпись связана через aria-labelledby, а не обёрткой <label>. */
+  labelId?: string;
   divider?: boolean;
   children: ReactNode;
 }) {
+  const Tag = labelId ? 'div' : 'label';
   return (
-    <label
+    <Tag
       className={[
-        'flex min-w-0 flex-col rounded-md px-3 py-1.5 focus-within:outline-3 focus-within:outline-primary',
+        // Поле, где сейчас ввод, — подложка и жёлтая полоса снизу, как у активного пункта меню.
+        'flex min-w-0 flex-col rounded-md px-3 py-1.5 transition-colors focus-within:bg-surface-muted focus-within:shadow-[inset_0_-3px_0_var(--color-accent)]',
         divider
           ? 'rounded-none border-dashed border-line-soft max-sm:border-t-2 sm:border-l-2'
           : '',
       ].join(' ')}
     >
-      <span className="text-sm font-semibold text-ink-muted">{label}</span>
+      <span id={labelId} className="text-sm font-semibold text-ink-muted">
+        {label}
+      </span>
       {children}
-    </label>
+    </Tag>
   );
 }
 

@@ -20,8 +20,13 @@ export const userRoutes: RouteObject[] = [
     path: 'me/events',
     lazy: async () => ({ Component: (await import('./MyEventsPage')).MyEventsRoute }),
   },
+  // Свой профиль: /me/profile ведёт на /users/:id, правка — отдельной страницей.
   {
     path: 'me/profile',
+    lazy: async () => ({ Component: (await import('./ProfilePage')).MyProfileRedirect }),
+  },
+  {
+    path: 'me/profile/edit',
     lazy: async () => ({ Component: (await import('./ProfilePage')).EditProfileRoute }),
   },
   {
