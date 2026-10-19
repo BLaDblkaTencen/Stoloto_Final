@@ -1,20 +1,15 @@
+import { formatBbox, parseBbox, venuesQuery } from '@sport/shared/schemas/venues';
 import { describe, expect, it } from 'vitest';
-import { AppError } from '../../lib/errors';
-import { inBbox, parseBbox } from './geo';
 import {
-  DEFAULT_LIMIT,
-  MAX_LIMIT,
+  buildVenueTypes,
   isSuitable,
-  normalizeLimit,
   searchVenues,
-  toVenueDto,
+  sportTypesFor,
+  toVenueCard,
+  type VenueRow,
 } from './search';
-import type { VenueRecord } from './types';
-import { VENUE_TYPE_LABELS, buildVenueTypesResponse } from './venue-types';
 
-function venue(
-  patch: Partial<VenueRecord> & Pick<VenueRecord, 'id' | 'name' | 'type'>,
-): VenueRecord {
+function venue(patch: Partial<VenueRow> & Pick<VenueRow, 'id' | 'name' | 'type'>): VenueRow {
   return {
     address: 'ул. Ленина, 1',
     lat: 56.01,
@@ -24,11 +19,12 @@ function venue(
     contactName: null,
     contactPhone: null,
     contactNote: null,
+    createdAt: new Date(),
     ...patch,
   };
 }
 
-const venues: VenueRecord[] = [
+const rows: VenueRow[] = [
   venue({
     id: 'v1',
     name: 'Кафе «Ход конём»',
@@ -45,168 +41,138 @@ const venues: VenueRecord[] = [
   venue({ id: 'v5', name: 'Центральный парк', type: 'park', lat: 56.0079, lng: 92.8531 }),
 ];
 
-const ids = (list: { id: string }[]) => list.map((v) => v.id);
+const ids = (list: { id: string }[]) => list.map((v) => v.id).sort();
+const query = (raw: Record<string, string> = {}) => venuesQuery.parse(raw);
 
 describe('parseBbox', () => {
-  it('разбирает четыре числа', () => {
-    expect(parseBbox('92.8,56.0,92.9,56.1')).toEqual({
+  it('разбирает четыре числа, пробелы допустимы', () => {
+    expect(parseBbox(' 92.8, 56.0, 92.9, 56.1 ')).toEqual({
       minLng: 92.8,
-      minLat: 56.0,
+      minLat: 56,
       maxLng: 92.9,
       maxLat: 56.1,
     });
   });
 
-  it('допускает пробелы вокруг чисел', () => {
-    expect(parseBbox(' 92.8, 56.0, 92.9, 56.1 ').maxLat).toBe(56.1);
+  it.each([
+    '',
+    '92.8,56.0,92.9',
+    '1,2,3,4,5',
+    'a,b,c,d',
+    '92.8,,92.9,56.1',
+    '92.9,56.0,92.8,56.1',
+    '92.8,56.1,92.9,56.0',
+    '92.8,56.0,92.9,91',
+    '-181,56.0,92.9,56.1',
+    '92.8,56.0,Infinity,56.1',
+  ])('неверная область «%s» → null', (raw) => {
+    expect(parseBbox(raw)).toBeNull();
+  });
+
+  it('formatBbox и parseBbox обратимы', () => {
+    const bbox = { minLng: 92.8, minLat: 56, maxLng: 92.9, maxLat: 56.1 };
+    expect(parseBbox(formatBbox(bbox))).toEqual(bbox);
+  });
+});
+
+describe('venuesQuery', () => {
+  it('значения по умолчанию', () => {
+    expect(query()).toEqual({ onlySuitable: false, limit: 200 });
+  });
+
+  it('типы через запятую без дублей', () => {
+    expect(query({ type: 'cafe, club,cafe' }).type).toEqual(['cafe', 'club']);
   });
 
   it.each([
-    ['пустая строка', ''],
-    ['три числа', '92.8,56.0,92.9'],
-    ['пять чисел', '1,2,3,4,5'],
-    ['не числа', 'a,b,c,d'],
-    ['пустой элемент', '92.8,,92.9,56.1'],
-    ['min больше max по долготе', '92.9,56.0,92.8,56.1'],
-    ['min больше max по широте', '92.8,56.1,92.9,56.0'],
-    ['широта вне диапазона', '92.8,56.0,92.9,91'],
-    ['долгота вне диапазона', '-181,56.0,92.9,56.1'],
-    ['Infinity', '92.8,56.0,Infinity,56.1'],
-  ])('%s: 422 INVALID_BBOX', (_name, raw) => {
-    try {
-      parseBbox(raw);
-    } catch (e) {
-      expect(e).toBeInstanceOf(AppError);
-      expect([(e as AppError).status, (e as AppError).code]).toEqual([422, 'INVALID_BBOX']);
-      return;
-    }
-    throw new Error('Ожидалась ошибка INVALID_BBOX');
-  });
-
-  it('inBbox: границы включены', () => {
-    const bbox = parseBbox('92.8,56.0,92.9,56.1');
-    expect(inBbox({ lat: 56.0, lng: 92.8 }, bbox)).toBe(true);
-    expect(inBbox({ lat: 56.1, lng: 92.9 }, bbox)).toBe(true);
-    expect(inBbox({ lat: 56.11, lng: 92.85 }, bbox)).toBe(false);
+    ['неизвестный тип', { type: 'cafe,bar' }, 'type'],
+    ['неверная область', { bbox: '1,2,3' }, 'bbox'],
+    ['лимит больше 500', { limit: '501' }, 'limit'],
+    ['вид спорта не UUID', { sportId: 'football' }, 'sportId'],
+  ])('%s: ошибка поля %s', (_name, raw, field) => {
+    const result = venuesQuery.safeParse(raw);
+    expect(result.success).toBe(false);
+    expect(result.error!.issues[0]!.path).toEqual([field]);
   });
 });
 
 describe('searchVenues', () => {
-  it('без параметров: все площадки по названию, без поля suitable', () => {
-    const result = searchVenues(venues);
+  it('без вида спорта: все, по названию, без поля suitable', () => {
+    const result = searchVenues(rows, query());
     expect(result).toHaveLength(5);
     expect(result.every((v) => !('suitable' in v))).toBe(true);
     const names = result.map((v) => v.name);
-    expect(names).toEqual([...names].sort((a, b) => a.localeCompare(b, 'ru')));
+    expect(names).toEqual([...names].sort(new Intl.Collator('ru').compare));
   });
 
-  it('фильтр по типам', () => {
-    expect(ids(searchVenues(venues, { types: ['cafe', 'club'] })).sort()).toEqual(['v1', 'v2']);
+  it('фильтры: типы, область, текст по названию и адресу', () => {
+    expect(ids(searchVenues(rows, query({ type: 'cafe,club' })))).toEqual(['v1', 'v2']);
+    expect(ids(searchVenues(rows, query({ bbox: '92.84,56.00,92.86,56.015' })))).toEqual([
+      'v1',
+      'v2',
+      'v4',
+      'v5',
+    ]);
+    expect(ids(searchVenues(rows, query({ q: 'ЭНДШПИЛЬ' })))).toEqual(['v2']);
+    expect(ids(searchVenues(rows, query({ q: 'мира' })))).toEqual(['v1']);
   });
 
-  it('пустой список типов не фильтрует', () => {
-    expect(searchVenues(venues, { types: [] })).toHaveLength(5);
+  it('шахматы: подходящие первыми и помечены', () => {
+    const result = searchVenues(rows, query(), ['cafe', 'club']);
+    expect(ids(result.slice(0, 2))).toEqual(['v1', 'v2']);
+    expect(result.map((v) => v.suitable)).toEqual([true, true, false, false, false]);
   });
 
-  it('фильтр по области карты', () => {
-    const bbox = parseBbox('92.84,56.00,92.86,56.015');
-    expect(ids(searchVenues(venues, { bbox })).sort()).toEqual(['v1', 'v2', 'v4', 'v5']);
+  it('onlySuitable оставляет подходящие; без вида спорта не действует', () => {
+    expect(ids(searchVenues(rows, query({ onlySuitable: 'true' }), ['field', 'hall']))).toEqual([
+      'v3',
+      'v4',
+    ]);
+    expect(searchVenues(rows, query({ onlySuitable: 'true' }))).toHaveLength(5);
   });
 
-  it('текстовый поиск по названию и адресу без учёта регистра', () => {
-    expect(ids(searchVenues(venues, { q: 'ЭНДШПИЛЬ' }))).toEqual(['v2']);
-    expect(ids(searchVenues(venues, { q: 'мира' }))).toEqual(['v1']);
-    expect(searchVenues(venues, { q: 'нет такого' })).toEqual([]);
-  });
-
-  it('шахматы: подходящие первыми и помечены suitable', () => {
-    const result = searchVenues(venues, { sportVenueTypes: ['cafe', 'club'] });
-    expect(ids(result).slice(0, 2).sort()).toEqual(['v1', 'v2']);
-    expect(result.slice(0, 2).every((v) => v.suitable === true)).toBe(true);
-    expect(result.slice(2).every((v) => v.suitable === false)).toBe(true);
-    expect(result).toHaveLength(5);
-  });
-
-  it('onlySuitable оставляет только подходящие', () => {
-    const result = searchVenues(venues, { sportVenueTypes: ['field', 'hall'], onlySuitable: true });
-    expect(ids(result).sort()).toEqual(['v3', 'v4']);
-  });
-
-  it('свой вид спорта без подсказки: подходят все площадки', () => {
-    const result = searchVenues(venues, { sportVenueTypes: [], onlySuitable: true });
-    expect(result).toHaveLength(5);
+  it('свой вид спорта без подсказки: подходят все', () => {
+    const result = searchVenues(rows, query({ onlySuitable: 'true' }), []);
     expect(result.every((v) => v.suitable === true)).toBe(true);
-  });
-
-  it('onlySuitable без вида спорта игнорируется', () => {
-    expect(searchVenues(venues, { onlySuitable: true })).toHaveLength(5);
-  });
-
-  it('фильтры комбинируются', () => {
-    const result = searchVenues(venues, {
-      sportVenueTypes: ['cafe', 'club'],
-      onlySuitable: true,
-      q: 'клуб',
-    });
-    expect(ids(result)).toEqual(['v2']);
+    expect(result).toHaveLength(5);
   });
 
   it('лимит обрезает выдачу', () => {
-    expect(searchVenues(venues, { limit: 2 })).toHaveLength(2);
+    expect(searchVenues(rows, query({ limit: '2' }))).toHaveLength(2);
   });
 });
 
-describe('normalizeLimit', () => {
-  it('значения по умолчанию и границы', () => {
-    expect(normalizeLimit(undefined)).toBe(DEFAULT_LIMIT);
-    expect(normalizeLimit(Number.NaN)).toBe(DEFAULT_LIMIT);
-    expect(normalizeLimit(0)).toBe(1);
-    expect(normalizeLimit(-5)).toBe(1);
-    expect(normalizeLimit(10.9)).toBe(10);
-    expect(normalizeLimit(100000)).toBe(MAX_LIMIT);
-  });
-});
-
-describe('toVenueDto', () => {
-  it('контакт собирается из заполненных полей', () => {
-    const dto = toVenueDto(venues[0]!);
-    expect(dto.contact).toEqual({ name: 'Ирина Соколова', phone: '+7 900 000-01-01', note: null });
+describe('карточка, подсказки, типы', () => {
+  it('контакт собирается из заполненных полей, у парка контакта нет', () => {
+    expect(toVenueCard(rows[0]!).contact).toEqual({
+      name: 'Ирина Соколова',
+      phone: '+7 900 000-01-01',
+      note: null,
+    });
+    expect(toVenueCard(rows[4]!).contact).toBeNull();
+    expect(toVenueCard(rows[0]!)).not.toHaveProperty('createdAt');
   });
 
-  it('парки и дворы без контактов: contact = null', () => {
-    expect(toVenueDto(venues[4]!).contact).toBeNull();
-  });
-
-  it('suitable добавляется только когда передан', () => {
-    expect(toVenueDto(venues[0]!)).not.toHaveProperty('suitable');
-    expect(toVenueDto(venues[0]!, false).suitable).toBe(false);
-  });
-});
-
-describe('isSuitable', () => {
-  it('учитывает список типов; пустой список подходит всем', () => {
-    expect(isSuitable('cafe', ['cafe', 'club'])).toBe(true);
-    expect(isSuitable('park', ['cafe', 'club'])).toBe(false);
+  it('isSuitable и sportTypesFor', () => {
+    expect(isSuitable('park', ['cafe'])).toBe(false);
     expect(isSuitable('park', [])).toBe(true);
-  });
-});
-
-describe('buildVenueTypesResponse', () => {
-  it('отдаёт все типы с русскими подписями', () => {
-    const { types } = buildVenueTypesResponse([]);
-    expect(types).toHaveLength(8);
-    expect(types.find((t) => t.value === 'cafe')?.label).toBe('Кафе');
-    expect(types.every((t) => t.label === VENUE_TYPE_LABELS[t.value])).toBe(true);
+    const links = [
+      { sportId: 'chess', venueType: 'cafe' as const },
+      { sportId: 'chess', venueType: 'club' as const },
+    ];
+    expect(sportTypesFor(links, 'chess')).toEqual(['cafe', 'club']);
+    expect(sportTypesFor(links, 'curling')).toEqual([]);
+    expect(sportTypesFor(links, undefined)).toBeUndefined();
   });
 
-  it('группирует связки по виду спорта без дублей; у вида спорта без связок ключа нет', () => {
-    const { bySport } = buildVenueTypesResponse([
+  it('типы площадок с подписями и группировка по виду спорта без дублей', () => {
+    const result = buildVenueTypes([
       { sportId: 'chess', venueType: 'cafe' },
-      { sportId: 'chess', venueType: 'club' },
       { sportId: 'chess', venueType: 'cafe' },
       { sportId: 'football', venueType: 'field' },
     ]);
-    expect(bySport).toEqual({ chess: ['cafe', 'club'], football: ['field'] });
-    expect(bySport).not.toHaveProperty('curling');
+    expect(result.types).toHaveLength(8);
+    expect(result.types.find((t) => t.value === 'cafe')?.label).toBe('Кафе');
+    expect(result.bySport).toEqual({ chess: ['cafe'], football: ['field'] });
   });
 });

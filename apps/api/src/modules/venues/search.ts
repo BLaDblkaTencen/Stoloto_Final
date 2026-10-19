@@ -1,32 +1,37 @@
-// Поиск площадок для карты (задача 2.8). Справочник небольшой (десятки или сотни записей),
-// поэтому фильтры применяются к списку в памяти; слой данных отдаёт все площадки.
-import { inBbox } from './geo';
-import type { VenueDto, VenueQuery, VenueRecord, VenueType } from './types';
+// Поиск площадок без обращения к базе (задача 2.8). Справочник небольшой и меняется только сидом,
+// поэтому сервис держит его в памяти, а фильтры применяются здесь.
+import type { VenueType } from '@sport/shared';
+import {
+  inBbox,
+  VENUE_TYPE_LABELS,
+  type Venue,
+  type VenueCard,
+  type VenuesQuery,
+  type VenueTypesResponse,
+} from '@sport/shared/schemas/venues';
+import { VENUE_TYPES } from '@sport/shared';
+import type { venues } from '../../db/schema';
 
-export const DEFAULT_LIMIT = 200;
-export const MAX_LIMIT = 500;
+export type VenueRow = typeof venues.$inferSelect;
+export type SportVenueLink = { sportId: string; venueType: VenueType };
 
-export function normalizeLimit(limit: number | undefined): number {
-  if (limit === undefined || !Number.isFinite(limit)) return DEFAULT_LIMIT;
-  return Math.min(MAX_LIMIT, Math.max(1, Math.trunc(limit)));
-}
+const collator = new Intl.Collator('ru');
 
 /** Контакт показываем, только если заполнено хотя бы одно поле. */
-export function toVenueDto(venue: VenueRecord, suitable?: boolean): VenueDto {
-  const hasContact = Boolean(venue.contactName || venue.contactPhone || venue.contactNote);
+export function toVenueCard(row: VenueRow): VenueCard {
+  const hasContact = Boolean(row.contactName || row.contactPhone || row.contactNote);
   return {
-    id: venue.id,
-    name: venue.name,
-    type: venue.type,
-    address: venue.address,
-    lat: venue.lat,
-    lng: venue.lng,
-    description: venue.description,
-    workingHours: venue.workingHours,
+    id: row.id,
+    name: row.name,
+    type: row.type,
+    address: row.address,
+    lat: row.lat,
+    lng: row.lng,
+    description: row.description,
+    workingHours: row.workingHours,
     contact: hasContact
-      ? { name: venue.contactName, phone: venue.contactPhone, note: venue.contactNote }
+      ? { name: row.contactName, phone: row.contactPhone, note: row.contactNote }
       : null,
-    ...(suitable === undefined ? {} : { suitable }),
   };
 }
 
@@ -34,33 +39,57 @@ export function toVenueDto(venue: VenueRecord, suitable?: boolean): VenueDto {
  * Подходит ли тип площадки виду спорта.
  * У вида спорта без подсказки (свой вариант) подходят все площадки: подсвечивать нечего.
  */
-export function isSuitable(type: VenueType, sportVenueTypes: readonly VenueType[]): boolean {
-  return sportVenueTypes.length === 0 || sportVenueTypes.includes(type);
+export function isSuitable(type: VenueType, sportTypes: readonly VenueType[]): boolean {
+  return sportTypes.length === 0 || sportTypes.includes(type);
 }
 
-export function searchVenues(venues: readonly VenueRecord[], query: VenueQuery = {}): VenueDto[] {
-  const sportSelected = query.sportVenueTypes !== undefined;
-  const sportTypes = query.sportVenueTypes ?? [];
-  const text = query.q?.trim().toLowerCase();
-  const typeSet = query.types && query.types.length > 0 ? new Set(query.types) : null;
+/** Подходящие типы для вида спорта; undefined, если вид спорта не выбран. */
+export function sportTypesFor(
+  links: readonly SportVenueLink[],
+  sportId: string | undefined,
+): VenueType[] | undefined {
+  if (!sportId) return undefined;
+  return links.filter((link) => link.sportId === sportId).map((link) => link.venueType);
+}
 
-  const result: VenueDto[] = [];
-  for (const venue of venues) {
-    if (typeSet && !typeSet.has(venue.type)) continue;
-    if (query.bbox && !inBbox(venue, query.bbox)) continue;
-    if (text && !`${venue.name} ${venue.address}`.toLowerCase().includes(text)) continue;
+export function searchVenues(
+  rows: readonly VenueRow[],
+  query: Omit<VenuesQuery, 'sportId'>,
+  sportTypes?: readonly VenueType[],
+): Venue[] {
+  const text = query.q?.toLowerCase();
+  const types = query.type?.length ? new Set(query.type) : null;
 
-    const suitable = sportSelected ? isSuitable(venue.type, sportTypes) : undefined;
-    if (query.onlySuitable && suitable === false) continue;
+  const result: Venue[] = [];
+  for (const row of rows) {
+    if (types && !types.has(row.type)) continue;
+    if (query.bbox && !inBbox(row, query.bbox)) continue;
+    if (text && !`${row.name} ${row.address}`.toLowerCase().includes(text)) continue;
 
-    result.push(toVenueDto(venue, suitable));
+    if (sportTypes === undefined) {
+      result.push(toVenueCard(row));
+      continue;
+    }
+    const suitable = isSuitable(row.type, sportTypes);
+    if (query.onlySuitable && !suitable) continue;
+    result.push({ ...toVenueCard(row), suitable });
   }
 
-  // Подходящие виду спорта идут первыми, дальше по названию.
-  result.sort((a, b) => {
-    if (a.suitable !== b.suitable) return a.suitable ? -1 : 1;
-    return a.name.localeCompare(b.name, 'ru');
-  });
+  // Подходящие виду спорта первыми, дальше по названию.
+  result.sort((a, b) =>
+    a.suitable !== b.suitable ? (a.suitable ? -1 : 1) : collator.compare(a.name, b.name),
+  );
+  return result.slice(0, query.limit);
+}
 
-  return result.slice(0, normalizeLimit(query.limit));
+export function buildVenueTypes(links: readonly SportVenueLink[]): VenueTypesResponse {
+  const bySport: Record<string, VenueType[]> = {};
+  for (const { sportId, venueType } of links) {
+    const list = (bySport[sportId] ??= []);
+    if (!list.includes(venueType)) list.push(venueType);
+  }
+  return {
+    types: VENUE_TYPES.map((value) => ({ value, label: VENUE_TYPE_LABELS[value] })),
+    bySport,
+  };
 }
