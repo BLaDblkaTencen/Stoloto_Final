@@ -1,0 +1,18 @@
+# Все текстовые файлы хранятся в репо с LF, независимо от ОС
+* text=auto eol=lf
+
+# Скрипты Windows должны оставаться с CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Бинарные файлы
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.jar binary
