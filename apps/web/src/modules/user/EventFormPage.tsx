@@ -36,7 +36,7 @@ import {
 import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { useMyOrganization } from '../org/api';
-import { formErrors } from '../org/errors';
+import { formErrors, useFreshErrors } from '../org/errors';
 import { MapPicker, type PlaceValue } from '../org/map';
 import { useEvent, useSaveEvent, useSports } from './api';
 import { isoDay, isoToZoned, LOCAL_TIME_NOTE, zonedToIso } from './format';
@@ -55,6 +55,25 @@ const JOIN_MODE_OPTIONS = [
     text: 'Человек отправляет заявку, вы принимаете или отклоняете её',
   },
 ] as const;
+
+/** Какие ошибки схемы и сервера относятся к полю формы: при его правке они скрываются. */
+const ERROR_KEYS: Record<keyof FormState, string[]> = {
+  title: ['title'],
+  sport: ['sportId', 'sportName'],
+  sportName: ['sportId', 'sportName'],
+  day: ['startsAt'],
+  time: ['startsAt'],
+  endTime: ['endsAt'],
+  place: ['venueId', 'lat', 'address'],
+  address: ['address'],
+  placeNotes: ['placeNotes'],
+  description: ['description'],
+  requirements: ['requirements'],
+  joinMode: ['joinMode'],
+  level: ['level'],
+  capacity: ['capacity'],
+  chatUrl: ['chatUrl'],
+};
 
 type FormState = {
   title: string;
@@ -193,7 +212,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
   const [form, setForm] = useState(() => initialState(event));
   const [clientFields, setClientFields] = useState<Record<string, string>>({});
   const server = formErrors(save.error, 'Не получилось сохранить. Попробуйте ещё раз');
-  const fields = Object.keys(clientFields).length > 0 ? clientFields : server.fields;
+  const fresh = useFreshErrors(Object.keys(clientFields).length > 0 ? clientFields : server.fields);
   const formRef = useRef<HTMLFormElement>(null);
 
   // После неудачной отправки — к первому полю с ошибкой: на длинной форме его не видно.
@@ -201,10 +220,13 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
     formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
   }, [clientFields, save.error]);
 
-  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
+  const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
+    fresh.edit(...ERROR_KEYS[key]);
     setForm((current) => ({ ...current, [key]: value }));
+  };
 
-  const choosePlace = (place: PlaceValue) =>
+  const choosePlace = (place: PlaceValue) => {
+    fresh.edit(...ERROR_KEYS.place);
     setForm((current) => {
       const previous = current.place?.kind === 'venue' ? current.place.venue.address : '';
       // Адрес площадки подставляем, пока человек не вписал свой.
@@ -217,9 +239,11 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             : '';
       return { ...current, place, address };
     });
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    fresh.reset();
     const body = toBody(form);
     const schema = event ? updateEventSchema : createEventSchema;
     const parsed = schema.safeParse(body);
@@ -256,14 +280,14 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             maxLength={EVENT_LIMITS.title.max}
             value={form.title}
             onChange={(e) => set('title', e.target.value)}
-            error={fields.title}
+            error={fresh.errorOf('title')}
           />
           <SportField
             sport={form.sport}
             sportName={form.sportName}
             onSport={(value) => set('sport', value)}
             onSportName={(value) => set('sportName', value)}
-            error={fields.sportId ?? fields.sportName}
+            error={fresh.errorOf('sportId', 'sportName')}
           />
           <TextareaField
             label="Что будет на встрече"
@@ -272,7 +296,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             maxLength={EVENT_LIMITS.description.max}
             value={form.description}
             onChange={(e) => set('description', e.target.value)}
-            error={fields.description}
+            error={fresh.errorOf('description')}
           />
         </Section>
 
@@ -284,7 +308,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
               min={isoDay(0)}
               value={form.day}
               onChange={(e) => set('day', e.target.value)}
-              error={fields.startsAt}
+              error={fresh.errorOf('startsAt')}
             />
             <TextField
               label="Начало"
@@ -298,7 +322,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
               hint="Необязательно"
               value={form.endTime}
               onChange={(e) => set('endTime', e.target.value)}
-              error={fields.endsAt}
+              error={fresh.errorOf('endsAt')}
             />
           </div>
         </Section>
@@ -308,7 +332,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             sportId={form.sport && form.sport !== OTHER_SPORT ? form.sport : undefined}
             value={form.place}
             onChange={choosePlace}
-            error={fields.venueId ?? fields.lat}
+            error={fresh.errorOf('venueId', 'lat')}
           />
           <TextField
             label="Адрес"
@@ -320,7 +344,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             maxLength={EVENT_LIMITS.address.max}
             value={form.address}
             onChange={(e) => set('address', e.target.value)}
-            error={fields.address}
+            error={fresh.errorOf('address')}
           />
           <TextField
             label="Как найти"
@@ -328,7 +352,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             maxLength={EVENT_LIMITS.placeNotes.max}
             value={form.placeNotes}
             onChange={(e) => set('placeNotes', e.target.value)}
-            error={fields.placeNotes}
+            error={fresh.errorOf('placeNotes')}
           />
         </Section>
 
@@ -338,7 +362,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             options={JOIN_MODE_OPTIONS}
             value={form.joinMode}
             onChange={(value) => set('joinMode', value)}
-            error={fields.joinMode}
+            error={fresh.errorOf('joinMode')}
             inline
           />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -347,7 +371,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
               options={EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_LABELS[value] }))}
               value={form.level}
               onChange={(e) => set('level', e.target.value as EventLevel)}
-              error={fields.level}
+              error={fresh.errorOf('level')}
             />
             <TextField
               label="Лимит мест"
@@ -358,7 +382,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
               hint="Пусто — без ограничения"
               value={form.capacity}
               onChange={(e) => set('capacity', e.target.value)}
-              error={fields.capacity}
+              error={fresh.errorOf('capacity')}
             />
           </div>
           <TextareaField
@@ -368,7 +392,7 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             maxLength={EVENT_LIMITS.requirements.max}
             value={form.requirements}
             onChange={(e) => set('requirements', e.target.value)}
-            error={fields.requirements}
+            error={fresh.errorOf('requirements')}
           />
           <TextField
             label="Ссылка на чат участников"
@@ -377,14 +401,12 @@ function EventFormScreen({ event }: { event?: EventDetails }) {
             placeholder="https://"
             value={form.chatUrl}
             onChange={(e) => set('chatUrl', e.target.value)}
-            error={fields.chatUrl}
+            error={fresh.errorOf('chatUrl')}
           />
         </Section>
 
         {server.message && <Alert>{server.message}</Alert>}
-        {Object.keys(fields).length > 0 && (
-          <Alert tone="warning">Проверьте поля, отмеченные красным.</Alert>
-        )}
+        {fresh.hasErrors && <Alert tone="warning">Проверьте поля, отмеченные красным.</Alert>}
         <div className="flex flex-wrap gap-3">
           <Button type="submit" size="lg" loading={save.isPending}>
             {event ? 'Сохранить изменения' : 'Опубликовать встречу'}

@@ -71,71 +71,74 @@ function EventView({ event }: { event: EventDetails }) {
 
       {event.permissions.isOrganizer && <OrganizerPanel event={event} />}
 
+      {/* На телефоне порядок: описание, запись, обсуждение — кнопка «Записаться» не уходит вниз.
+          На широком экране запись и участники — колонкой справа на всю высоту. */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <Card className="flex flex-col gap-6">
-            <header className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <SportTile sport={event.sport} size={44} />
-                <span className="font-semibold">{event.sport.name}</span>
-                <JoinModeBadge mode={event.joinMode} />
-                <Badge icon={null}>{EVENT_LEVEL_LABELS[event.level]}</Badge>
+        <Card className="flex min-w-0 flex-col gap-6 lg:col-start-1">
+          <header className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <SportTile sport={event.sport} size={44} />
+              <span className="font-semibold">{event.sport.name}</span>
+              <JoinModeBadge mode={event.joinMode} />
+              <Badge icon={null}>{EVENT_LEVEL_LABELS[event.level]}</Badge>
+            </div>
+            <h1 className="text-h2 leading-tight">{event.title}</h1>
+            <p>
+              Организатор: <OrganizerLink organizer={event.organizer} />
+            </p>
+          </header>
+
+          <section className="flex flex-col gap-2">
+            <h2 className="text-h3">Когда и где</h2>
+            <MetaLine icon="calendar">
+              {formatWhen(event.startsAt, event.endsAt)}
+              <span className="block">{LOCAL_TIME_NOTE}</span>
+            </MetaLine>
+            <MetaLine icon="pin">
+              {event.address}
+              {event.placeNotes && <span className="block">{event.placeNotes}</span>}
+            </MetaLine>
+            {/* «Место встречи» (1.10): площадка с контактом администратора и метка на карте. */}
+            {event.venue && (
+              <div className="mt-2">
+                <VenueCard venue={venueCardData(event.venue)} />
               </div>
-              <h1 className="text-h2 leading-tight">{event.title}</h1>
-              <p>
-                Организатор: <OrganizerLink organizer={event.organizer} />
-              </p>
-            </header>
+            )}
+            {event.lat !== null && event.lng !== null && (
+              <div className="mt-2">
+                <PlaceMap
+                  lat={event.lat}
+                  lng={event.lng}
+                  title={event.venue?.name ?? event.address}
+                  venueType={event.venue?.type}
+                />
+              </div>
+            )}
+          </section>
 
-            <section className="flex flex-col gap-2">
-              <h2 className="text-h3">Когда и где</h2>
-              <MetaLine icon="calendar">
-                {formatWhen(event.startsAt, event.endsAt)}
-                <span className="block">{LOCAL_TIME_NOTE}</span>
-              </MetaLine>
-              <MetaLine icon="pin">
-                {event.address}
-                {event.placeNotes && <span className="block">{event.placeNotes}</span>}
-              </MetaLine>
-              {/* «Место встречи» (1.10): площадка с контактом администратора и метка на карте. */}
-              {event.venue && (
-                <div className="mt-2">
-                  <VenueCard venue={venueCardData(event.venue)} />
-                </div>
-              )}
-              {event.lat !== null && event.lng !== null && (
-                <div className="mt-2">
-                  <PlaceMap
-                    lat={event.lat}
-                    lng={event.lng}
-                    title={event.venue?.name ?? event.address}
-                    venueType={event.venue?.type}
-                  />
-                </div>
-              )}
-            </section>
+          <section className="flex flex-col gap-2">
+            <h2 className="text-h3">Что будет</h2>
+            <p className="whitespace-pre-line">{event.description}</p>
+          </section>
 
-            <section className="flex flex-col gap-2">
-              <h2 className="text-h3">Что будет</h2>
-              <p className="whitespace-pre-line">{event.description}</p>
-            </section>
+          <section className="flex flex-col gap-2">
+            <h2 className="text-h3">Условия участия</h2>
+            <p>
+              <span className="font-semibold">Уровень:</span> {EVENT_LEVEL_LABELS[event.level]}
+            </p>
+            <p className="whitespace-pre-line">
+              {event.requirements ?? 'Особых требований нет: приходите в удобной одежде.'}
+            </p>
+          </section>
+        </Card>
 
-            <section className="flex flex-col gap-2">
-              <h2 className="text-h3">Условия участия</h2>
-              <p>
-                <span className="font-semibold">Уровень:</span> {EVENT_LEVEL_LABELS[event.level]}
-              </p>
-              <p className="whitespace-pre-line">
-                {event.requirements ?? 'Особых требований нет: приходите в удобной одежде.'}
-              </p>
-            </section>
-          </Card>
-          <Discussion event={event} />
-        </div>
-
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <JoinPanel event={event} />
           <Participants event={event} />
+        </div>
+
+        <div className="min-w-0 lg:col-start-1">
+          <Discussion event={event} />
         </div>
       </div>
     </div>

@@ -110,12 +110,21 @@ function CommentView({ comment }: { comment: Comment }) {
           <Link to={`/users/${author.id}`} className="font-semibold">
             {author.name}
           </Link>
-          {author.badge && (
-            <Badge tone={author.badge === 'organizer' ? 'success' : 'request'} icon={null}>
-              {author.badge === 'organizer' && author.badgeLabel !== 'Организатор'
-                ? `Организатор · ${author.badgeLabel}`
-                : author.badgeLabel}
+          {author.badge === 'moderator' && (
+            <Badge tone="request" icon={null}>
+              Модератор
             </Badge>
+          )}
+          {author.badge === 'organizer' && (
+            <>
+              <Badge tone="success" icon={null}>
+                Организатор
+              </Badge>
+              {/* Название организации — обычным текстом: длинное переносится, а плашка нет. */}
+              {author.badgeLabel !== 'Организатор' && (
+                <span className="text-sm font-semibold">{author.badgeLabel}</span>
+              )}
+            </>
           )}
           <time dateTime={comment.createdAt} className="text-sm text-ink-muted">
             {formatMoment(comment.createdAt)}
