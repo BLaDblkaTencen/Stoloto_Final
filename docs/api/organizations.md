@@ -43,13 +43,13 @@
 
 ```ts
 // apps/api/src/modules/organizations/service.ts — вызывает POST /api/events (участник 1)
-assertCanPublishAsOrganization(user: SessionUser): Promise<{ organizationId: string; name: string }>
+resolvePublishingOrganization(user: SessionUser): Promise<{ organizationId: string; name: string }>
 ```
 
 | Ситуация | Результат |
 | --- | --- |
 | организация `approved` | `{ organizationId, name }`: сервер событий ставит `events.organization_id` |
-| организации нет | 403 `ORG_NOT_APPROVED`: «Сначала подайте заявку на допуск организации…» |
+| организации нет | 404 `ORG_NOT_FOUND`: «Сначала подайте заявку на допуск организации…» |
 | `pending` | 403 `ORG_NOT_APPROVED`: «Заявка на рассмотрении…» |
 | `rejected` | 403 `ORG_NOT_APPROVED` с причиной отказа в тексте |
 | роль не `organization` | 403 `FORBIDDEN` |
@@ -60,14 +60,14 @@ assertCanPublishAsOrganization(user: SessionUser): Promise<{ organizationId: str
 
 ## 2. Панель организатора (задача 2.7)
 
-Права определяет только авторство события (`events.created_by`), поэтому панель общая для пользователей-организаторов и организаций. Правила решений живут в сервисе `registrations` участника 1 (`listForOrganizer`, `decide`, см. [api/events.md](events.md)); панель вызывает его и пробрасывает его ошибки (`NOT_EVENT_AUTHOR`, `NOT_PENDING`, `EVENT_UNAVAILABLE`, `EVENT_PAST`, `EVENT_FULL`).
+Права определяет только авторство события (`events.created_by`), поэтому панель общая для пользователей-организаторов и организаций. Правила решений живут в сервисе `registrations` участника 1: `listRegistrationsForAuthor` и `decideRegistration` (сигнатуры и ошибки — [api/events.md](events.md), «Сервис для панели организатора»). Панель вызывает их и пробрасывает их ошибки (`EVENT_NOT_FOUND`, `REGISTRATION_NOT_FOUND`, `NOT_EVENT_AUTHOR`, `NOT_PENDING`, `EVENT_UNAVAILABLE`, `EVENT_FULL` и др.).
 
 | Метод и путь | Кто | Запрос | Успех |
 | --- | --- | --- | --- |
-| `GET /api/organizer/events/:eventId/registrations` | автор события | — | `200` `{ items: OrganizerRegistration[], counts: { pending, confirmed, rejected, cancelled } }`: сначала `pending`, затем новее. Вкладки по статусам фильтрует интерфейс |
-| `POST /api/organizer/registrations/:registrationId/decision` | автор события | `{ "decision": "confirm" \| "reject" }` | `200` `OrganizerRegistration` с новым статусом |
+| `GET /api/events/:eventId/organizer/registrations` | автор события | `status?` (`pending`, `confirmed`, `rejected`, `cancelled`), по умолчанию все | `200` `{ items: OrganizerRegistration[], counts, capacity }`: сначала `pending`, затем новее |
+| `POST /api/events/:eventId/organizer/registrations/:registrationId/decision` | автор события | `{ "decision": "confirm" \| "reject" }` | `200` `OrganizerRegistration` с новым статусом |
 
-`OrganizerRegistration` — форма из сервиса участника 1. Лимит мест и число участников интерфейс берёт из карточки события. Маршруты появятся, когда сервис `registrations` будет в `main`.
+`OrganizerRegistration` — форма из сервиса участника 1. Маршруты подключаются, когда сервис `registrations` будет в `main`.
 
 ---
 
@@ -88,7 +88,7 @@ assertCanPublishAsOrganization(user: SessionUser): Promise<{ organizationId: str
 ```ts
 // apps/api/src/modules/venues/service.ts — вызывает POST /api/events (участник 1)
 resolveVenueForEvent(venueId: string): Promise<VenueCard>
-// неизвестная площадка — 422 VALIDATION_ERROR, fields.venueId
+// неизвестная площадка — 422 VENUE_NOT_FOUND с fields.venueId (текст под полем формы)
 ```
 
 Сервер событий берёт из ответа `lat`, `lng` и, если адрес не введён вручную, `address`. Своя точка (`lat` и `lng` вместе) без `venueId` и событие только с текстовым адресом тоже допустимы: карта необязательна.

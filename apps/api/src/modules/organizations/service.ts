@@ -41,10 +41,10 @@ const alreadyExists = () =>
 // ---------- Для других модулей ----------
 
 /**
- * Задача 2.6. Вызывается из POST /api/events (участник 1) для аккаунта organization.
- * Бросает 403 ORG_NOT_APPROVED, если организации нет или она не допущена.
+ * Задача 2.6. Вызывается из POST /api/events (участник 1, docs/api/events.md) для аккаунта organization.
+ * Нет организации — 404 ORG_NOT_FOUND, не допущена — 403 ORG_NOT_APPROVED с причиной отказа.
  */
-export async function assertCanPublishAsOrganization(
+export async function resolvePublishingOrganization(
   user: SessionUser,
 ): Promise<{ organizationId: string; name: string }> {
   if (user.role !== 'organization') {

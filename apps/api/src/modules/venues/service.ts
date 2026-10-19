@@ -10,7 +10,7 @@ import type {
 import { z } from 'zod';
 import { db } from '../../db/client';
 import { sportVenueTypes, venues } from '../../db/schema';
-import { AppError, errors } from '../../lib/errors';
+import { AppError } from '../../lib/errors';
 import {
   buildVenueTypes,
   searchVenues,
@@ -68,15 +68,15 @@ export async function getVenueTypes(): Promise<VenueTypesResponse> {
 
 /**
  * Для POST /api/events (участник 1): проверить площадку и отдать её адрес и координаты.
- * Неизвестная площадка — ошибка поля формы venueId (422).
+ * Неизвестная площадка — 422 VENUE_NOT_FOUND с ошибкой поля формы venueId.
  */
 export async function resolveVenueForEvent(venueId: string): Promise<VenueCard> {
-  try {
-    return await getVenue(venueId);
-  } catch (err) {
-    if (err instanceof AppError && err.code === 'VENUE_NOT_FOUND') {
-      throw errors.validation({ venueId: 'Площадка не найдена, выберите другую на карте' });
-    }
-    throw err;
+  const row = z.uuid().safeParse(venueId).success
+    ? (await loadCatalog()).byId.get(venueId)
+    : undefined;
+  if (!row) {
+    const message = 'Площадка не найдена, выберите другую на карте';
+    throw new AppError(422, 'VENUE_NOT_FOUND', message, { venueId: message });
   }
+  return toVenueCard(row);
 }

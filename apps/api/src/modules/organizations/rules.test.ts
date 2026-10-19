@@ -55,8 +55,13 @@ describe('checkPublishing (2.6)', () => {
     });
   });
 
+  it('организации нет: 404 ORG_NOT_FOUND с подсказкой подать заявку', () => {
+    const err = appError(() => checkPublishing(null));
+    expect([err.status, err.code]).toEqual([404, 'ORG_NOT_FOUND']);
+    expect(err.message).toContain('подайте заявку');
+  });
+
   it.each([
-    ['организации нет', null, 'подайте заявку'],
     ['на рассмотрении', makeOrg(), 'на рассмотрении'],
     ['отклонена', makeOrg({ status: 'rejected', rejectionReason: 'Нет описания' }), 'Нет описания'],
   ])('%s: 403 ORG_NOT_APPROVED с понятным текстом', (_name, org, text) => {

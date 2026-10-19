@@ -27,8 +27,8 @@ export function checkPublishing(org: OrganizationRow | null): {
 } {
   if (!org) {
     throw new AppError(
-      403,
-      'ORG_NOT_APPROVED',
+      404,
+      'ORG_NOT_FOUND',
       'Сначала подайте заявку на допуск организации, затем можно публиковать события',
     );
   }
