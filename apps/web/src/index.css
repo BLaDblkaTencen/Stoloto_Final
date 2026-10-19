@@ -1,0 +1,81 @@
+/*
+ * Стили приложения. Значения — только из docs/design/tokens.css (единственный источник).
+ * Tailwind читает токены через @theme: работают bg-primary, text-ink, rounded-lg, shadow-md,
+ * font-display, text-h2. Токены --text-*, --radius-*, --shadow-* совпадают по именам с темой
+ * Tailwind и заменяют её значения: например, text-sm — 16px, а не 14px.
+ */
+@import 'tailwindcss';
+@import '../../../docs/design/tokens.css';
+
+/*
+ * inline — утилиты подставляют var(--токен) напрямую; reference — Tailwind не объявляет эти
+ * переменные заново. Без reference получилось бы --color-bg: var(--color-bg), то есть
+ * ссылка на саму себя, которая перебила бы токен при другом порядке стилей.
+ */
+@theme inline reference {
+  --text-h1: var(--text-h1);
+  --text-h1-mobile: var(--text-h1-mobile);
+  --text-h2: var(--text-h2);
+  --text-h3: var(--text-h3);
+  /* Тени Tailwind по умолчанию подставляет готовым значением, поэтому привязываем явно. */
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-ink: var(--color-ink);
+  --color-ink-muted: var(--color-ink-muted);
+  --color-line-soft: var(--color-line-soft);
+  --color-primary: var(--color-primary);
+  --color-primary-ink: var(--color-primary-ink);
+  --color-accent: var(--color-accent);
+  --color-danger: var(--color-danger);
+  --color-danger-ink: var(--color-danger-ink);
+  --color-status-success: var(--status-success);
+  --color-status-warning: var(--status-warning);
+  --color-status-danger: var(--status-danger);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-free: var(--status-free);
+  --color-status-request: var(--status-request);
+  --font-display: var(--font-display);
+  --font-sans: var(--font-body);
+}
+
+/* Текст меньше 16px в интерфейсе запрещён (DESIGN_BRIEF): убираем text-xs из темы. */
+@theme {
+  --text-xs: initial;
+}
+
+@utility page-container {
+  max-width: 1360px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+@layer base {
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-body);
+    font-size: var(--text-base);
+    line-height: 1.5;
+  }
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 700;
+  }
+  a:hover {
+    color: var(--color-primary);
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+}

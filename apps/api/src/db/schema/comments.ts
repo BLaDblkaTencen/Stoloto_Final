@@ -20,14 +20,16 @@ export const comments = pgTable(
   'comments',
   {
     id: uuid('id').primaryKey().defaultRandom(),
+    // Глубина ответов — 1: ответ на ответ сервер привязывает к корневому комментарию.
+    // Колонка стоит перед event_id намеренно: порядок колонок составного ключа ниже должен
+    // совпадать с порядком в таблице, иначе pnpm db:push пересоздаёт ключ при каждом запуске.
+    parentId: uuid('parent_id'),
     eventId: uuid('event_id')
       .notNull()
       .references(() => events.id),
     authorId: uuid('author_id')
       .notNull()
       .references(() => users.id),
-    // Глубина ответов — 1: ответ на ответ сервер привязывает к корневому комментарию.
-    parentId: uuid('parent_id'),
     text: text('text').notNull(),
     isHidden: boolean('is_hidden').notNull().default(false),
     hiddenBy: uuid('hidden_by').references(() => users.id),

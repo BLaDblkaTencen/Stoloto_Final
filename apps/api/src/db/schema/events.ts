@@ -31,14 +31,16 @@ export const events = pgTable(
     sportId: uuid('sport_id')
       .notNull()
       .references(() => sports.id),
+    // Если задано, событие от имени организации. Составной ключ ниже гарантирует,
+    // что created_by — представитель именно этой организации.
+    // Что организация approved, проверяет сервер при создании (задача 2.4).
+    // Колонка стоит перед created_by намеренно: drizzle-kit читает колонки составного ключа
+    // в порядке таблицы, и при другом порядке pnpm db:push пересоздавал бы ключ при каждом запуске.
+    organizationId: uuid('organization_id'),
     // Автор события. Только он рассматривает заявки (см. registrations_decider_fk).
     createdBy: uuid('created_by')
       .notNull()
       .references(() => users.id),
-    // Если задано, событие от имени организации. Составной ключ ниже гарантирует,
-    // что created_by — представитель именно этой организации.
-    // Что организация approved, проверяет сервер при создании (задача 2.4).
-    organizationId: uuid('organization_id'),
     startsAt: tz('starts_at').notNull(),
     endsAt: tz('ends_at'),
     // Адрес хранится текстом всегда: без карты событие создаётся и открывается как обычно.

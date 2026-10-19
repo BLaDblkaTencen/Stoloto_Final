@@ -1,0 +1,23 @@
+{
+  "name": "stoloto-final",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.34.6",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @sport/api --filter @sport/web dev",
+    "build": "pnpm --filter @sport/web build",
+    "start": "pnpm --filter @sport/api start",
+    "typecheck": "pnpm -r typecheck",
+    "db:push": "pnpm --filter @sport/api db:push",
+    "db:seed": "pnpm --filter @sport/api db:seed",
+    "format": "prettier --write apps packages",
+    "format:check": "prettier --check apps packages"
+  },
+  "devDependencies": {
+    "prettier": "3.9.9",
+    "typescript": "7.0.2"
+  }
+}

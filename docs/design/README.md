@@ -48,38 +48,11 @@
 
 ## Подключение в приложении
 
-Tailwind v4: импортировать токены и пробросить их в тему, тогда работают классы `bg-primary`, `text-ink`, `rounded-lg`, `shadow-md`, `font-display`.
+Tailwind v4 уже настроен в [apps/web/src/index.css](../../apps/web/src/index.css): токены импортируются отсюда и пробрасываются в тему через `@theme inline reference`. Работают классы `bg-primary`, `text-ink`, `bg-status-success`, `rounded-lg`, `shadow-md`, `font-display`, `text-h2`; `text-sm` равен 16px, `text-xs` отключён. Новый токен из `tokens.css` добавляется туда же одной строкой.
 
-```css
-/* apps/web/src/index.css */
-@import 'tailwindcss';
-@import '../../../docs/design/tokens.css'; /* или скопировать в shared/ui */
+`reference` обязателен: без него Tailwind выводит `--color-bg: var(--color-bg)`, то есть переменную, которая ссылается сама на себя и может перебить значение токена.
 
-@theme inline {
-  --color-bg: var(--color-bg);
-  --color-surface: var(--color-surface);
-  --color-ink: var(--color-ink);
-  --color-ink-muted: var(--color-ink-muted);
-  --color-primary: var(--color-primary);
-  --color-accent: var(--color-accent);
-  --color-danger: var(--color-danger);
-  --font-display: var(--font-display);
-  --font-sans: var(--font-body);
-  --radius-sm: var(--radius-sm);
-  --radius-md: var(--radius-md);
-  --radius-lg: var(--radius-lg);
-  --radius-xl: var(--radius-xl);
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-}
-```
-
-Шрифты подключаются в `index.html` (Google Fonts, лицензия OFL):
-
-```html
-<link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@600;700&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet" />
-```
+Шрифты Comfortaa и Rubik (лицензия OFL) подключены пакетами `@fontsource` в `apps/web/src/main.tsx`: они собираются вместе с приложением и не зависят от доступа к Google Fonts. Макет `home.html` по-прежнему берёт их из Google Fonts, для просмотра макета это не важно.
 
 shadcn/ui: компоненты берём как основу, но переопределяем внешний вид под токены: обводка `border-2 border-ink`, тень `shadow-md`, радиус `rounded-md` у кнопок и `rounded-lg` у карточек.
 

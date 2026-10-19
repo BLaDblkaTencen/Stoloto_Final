@@ -1,0 +1,29 @@
+{
+  "name": "@sport/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "start": "tsx src/server.ts",
+    "typecheck": "tsc --noEmit",
+    "db:push": "drizzle-kit push",
+    "db:seed": "tsx src/db/seed/run.ts"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/helmet": "13.1.1",
+    "@fastify/rate-limit": "11.2.0",
+    "@fastify/static": "10.1.5",
+    "@node-rs/argon2": "2.2.1",
+    "@sport/shared": "workspace:*",
+    "drizzle-orm": "0.45.3",
+    "fastify": "5.12.5",
+    "postgres": "3.4.9",
+    "tsx": "4.23.15",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.1",
+    "drizzle-kit": "0.31.11"
+  }
+}
