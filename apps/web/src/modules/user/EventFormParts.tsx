@@ -30,7 +30,8 @@ function Group({
   );
 }
 
-const tileClass = (on: boolean) =>
+/** Плитка вида спорта: та же в форме встречи и в интересах профиля. */
+export const sportTileClass = (on: boolean) =>
   [
     'flex min-h-[104px] flex-col items-center justify-center gap-1.5 rounded-[18px] border-2 border-ink p-2',
     'text-center text-sm leading-tight font-semibold hyphens-auto [overflow-wrap:break-word] transition-[translate,rotate,box-shadow] duration-100',
@@ -68,7 +69,7 @@ export function SportTiles({
               // Фокус после неудачной отправки попадает на первую плитку группы с ошибкой.
               aria-invalid={error && index === 0 ? true : undefined}
               onClick={() => onChange(sport.id)}
-              className={tileClass(on)}
+              className={sportTileClass(on)}
               style={{
                 background: on ? sportColor(sport.slug) : undefined,
                 rotate: on ? '-1.5deg' : undefined,
@@ -83,7 +84,7 @@ export function SportTiles({
           type="button"
           aria-pressed={custom}
           onClick={() => onChange(customValue)}
-          className={`${tileClass(custom)} border-dashed`}
+          className={`${sportTileClass(custom)} border-dashed`}
           style={{ background: custom ? 'var(--color-accent)' : undefined }}
         >
           <Icon name="plus" size={30} strokeWidth={1.7} />
