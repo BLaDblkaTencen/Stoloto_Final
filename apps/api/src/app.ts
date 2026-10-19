@@ -28,7 +28,14 @@ export async function buildApp() {
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
-        imgSrc: ["'self'", 'data:', 'https://*.tile.openstreetmap.org'],
+        // Плитки карты: Leaflet берёт их с tile.openstreetmap.org, старые адреса — с a/b/c.tile….
+        // Маска *.tile… не покрывает адрес без поддомена, поэтому нужны обе записи.
+        imgSrc: [
+          "'self'",
+          'data:',
+          'https://tile.openstreetmap.org',
+          'https://*.tile.openstreetmap.org',
+        ],
         // Leaflet ставит позиции меток через style, поэтому inline-стили разрешены.
         styleSrc: ["'self'", "'unsafe-inline'"],
         fontSrc: ["'self'", 'data:'],
@@ -46,7 +53,18 @@ export async function buildApp() {
 
   // В проде один процесс отдаёт и API, и собранный фронтенд: один адрес, без CORS.
   if (isProduction && existsSync(webDist)) {
-    await app.register(fastifyStatic, { root: webDist, wildcard: false });
+    await app.register(fastifyStatic, {
+      root: webDist,
+      wildcard: false,
+      // В имени файлов из assets/ есть хэш содержимого: их можно кэшировать надолго.
+      // index.html — нет, иначе после деплоя браузер держал бы старую версию.
+      setHeaders: (reply, filePath) => {
+        const cache = /[\\/]assets[\\/]/.test(filePath)
+          ? 'public, max-age=31536000, immutable'
+          : 'no-cache';
+        reply.header('cache-control', cache);
+      },
+    });
   }
   app.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith('/api') || !isProduction) {

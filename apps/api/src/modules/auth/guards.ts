@@ -21,6 +21,8 @@ declare module 'fastify' {
 export function registerAuth(app: FastifyInstance) {
   app.decorateRequest('user', null);
   app.addHook('onRequest', async (request) => {
+    // Файлы интерфейса (скрипты, шрифты, картинки) пользователь не нужен — не ходим за ним в базу.
+    if (!request.url.startsWith('/api')) return;
     const token = request.cookies[SESSION_COOKIE];
     request.user = token ? await findSessionUser(token) : null;
   });

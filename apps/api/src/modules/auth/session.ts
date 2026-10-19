@@ -3,7 +3,7 @@
 // не даёт войти чужим аккаунтом.
 import { createHash, randomBytes } from 'node:crypto';
 import type { UserRole } from '@sport/shared';
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, lt } from 'drizzle-orm';
 import { db } from '../../db/client';
 import { sessions, users } from '../../db/schema';
 import { env } from '../../env';
@@ -30,6 +30,10 @@ export const sessionCookieOptions = () => ({
 /** Создать сессию; вернуть токен для cookie. */
 export async function createSession(userId: string) {
   const token = randomBytes(32).toString('base64url');
+  // Заодно убираем истёкшие сессии этого пользователя, чтобы таблица не росла бесконечно.
+  await db
+    .delete(sessions)
+    .where(and(eq(sessions.userId, userId), lt(sessions.expiresAt, new Date())));
   await db.insert(sessions).values({
     id: hashToken(token),
     userId,
