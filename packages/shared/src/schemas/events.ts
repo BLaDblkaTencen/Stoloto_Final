@@ -196,6 +196,8 @@ const day = z.iso.date('Дата в формате ГГГГ-ММ-ДД');
 export const eventListQuerySchema = z
   .object({
     q: z.string().trim().max(100, 'Слишком длинный запрос').optional(),
+    /** «Где»: часть адреса, пояснения к месту или названия площадки. */
+    place: z.string().trim().max(100, 'Слишком длинный запрос').optional(),
     sportId: idList.optional(),
     organizationId: z.uuid('Неверная организация').optional(),
     /** Один день; то же, что dateFrom = dateTo. */

@@ -9,7 +9,7 @@ import {
 import { and, eq, gt, gte, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '../../db/client';
-import { events, organizations, registrations, sports, users } from '../../db/schema';
+import { events, organizations, registrations, sports, users, venues } from '../../db/schema';
 import { escapeLike, sportColumns } from '../sports/service';
 
 /** Моя запись: отдельный псевдоним, чтобы не путать с подзапросами по registrations. */
@@ -87,6 +87,20 @@ export function feedConditions(query: EventListQuery, now: Date): SQL | undefine
         // По части слова: «фут» находит «Футбол», пока человек ещё печатает.
         ilike(events.title, pattern),
         ilike(sports.name, pattern),
+      ),
+    );
+  }
+  if (query.place) {
+    // «Где»: адрес, пояснение к месту или название площадки («Динамо», «Татышев»).
+    const pattern = `%${escapeLike(query.place)}%`;
+    conditions.push(
+      or(
+        ilike(events.address, pattern),
+        ilike(events.placeNotes, pattern),
+        inArray(
+          events.venueId,
+          db.select({ id: venues.id }).from(venues).where(ilike(venues.name, pattern)),
+        ),
       ),
     );
   }

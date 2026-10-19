@@ -36,6 +36,19 @@ export function formatWhen(startsAt: string, endsAt: string | null) {
     : `${day} · ${from} — ${capitalize(dayFormat.format(end))} · ${timeFormat.format(end)}`;
 }
 
+const shortDayFormat = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: EVENT_TIMEZONE,
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+});
+
+/** «Сб, 26 окт. · 08:00» — коротко, для стикеров «Мои записи». */
+export function formatShort(startsAt: string) {
+  const start = new Date(startsAt);
+  return `${capitalize(shortDayFormat.format(start))} · ${timeFormat.format(start)}`;
+}
+
 /** «26 октября, 14:05» — для времени заявки и комментариев. */
 export function formatMoment(value: string) {
   const date = new Date(value);

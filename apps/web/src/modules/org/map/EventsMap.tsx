@@ -11,6 +11,7 @@ import { useMe } from '../../auth/api';
 import { useSports } from '../api';
 import { roundBbox, useEventsOnMap, useVenues, type EventsMapFilters } from './api';
 import { MapBoundary } from './MapBoundary';
+import type { MapFocus } from './EventsMapView';
 
 const EventsMapView = lazy(() => import('./EventsMapView'));
 
@@ -20,6 +21,10 @@ export type EventsMapProps = {
   showVenues?: boolean;
   /** Выделенная метка, например событие, над которым курсор в списке. */
   selectedId?: string;
+  /** Нажали на метку встречи. */
+  onSelect?: (id: string) => void;
+  /** Перейти к встрече и открыть её попап. */
+  focus?: MapFocus;
   /** Высота классом Tailwind. */
   className?: string;
 };
@@ -28,6 +33,8 @@ export function EventsMap({
   filters = {},
   showVenues = false,
   selectedId,
+  onSelect,
+  focus,
   className = 'h-[480px]',
 }: EventsMapProps) {
   const [bbox, setBbox] = useState<Bbox | null>(null);
@@ -69,6 +76,8 @@ export function EventsMap({
           venues={showVenues ? (venues.data ?? []) : []}
           createHref={createHref}
           selectedId={selectedId}
+          onSelect={onSelect}
+          focus={focus}
           onBoundsChange={onBoundsChange}
           className={className}
         />

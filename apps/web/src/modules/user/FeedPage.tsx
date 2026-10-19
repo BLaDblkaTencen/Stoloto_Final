@@ -1,26 +1,29 @@
-// Главная: поиск, «Мои записи», чипы видов спорта, фильтры и лента ближайших встреч (задача 1.4).
+// Главная (задачи 1.4, 1.10) по макету docs/design/home.html: поиск «Чем заняться / Где / Когда»,
+// стикеры «Мои записи», чипы видов спорта, список встреч рядом с картой, «Как это работает».
 // Фильтры живут в адресе страницы: ссылкой на подборку можно поделиться, «Назад» возвращает фильтр.
 import { EVENT_LEVEL_LABELS, EVENT_LEVELS, JOIN_MODE_LABELS, JOIN_MODES } from '@sport/shared';
-import { useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router';
+import type { EventListItem } from '@sport/shared/schemas/events';
+import { useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
+import { ApiError } from '../../shared/api/client';
 import {
   Button,
   ButtonLink,
-  Card,
   Chip,
   EmptyState,
   ErrorState,
   Icon,
+  JoinModeBadge,
   SelectField,
   SkeletonList,
   SportChip,
   StatusBadge,
 } from '../../shared/ui';
 import { useMe } from '../auth/api';
-import { EventsMap } from '../org/map';
-import { useFeed, useMyRegistrations, useSports, type FeedParams } from './api';
-import { EventCard } from './EventCard';
-import { formatWhen, isoDay, LOCAL_TIME_NOTE } from './format';
+import { EventsMap, type MapFocus } from '../org/map';
+import { useFeed, useJoinEvent, useMyRegistrations, useSports, type FeedParams } from './api';
+import { OrganizerLink, SportTile } from './EventBits';
+import { formatSeats, formatShort, formatWhen, isoDay, LOCAL_TIME_NOTE, plural } from './format';
 
 const WHEN_OPTIONS = [
   { value: 'today', label: 'Сегодня' },
@@ -51,27 +54,46 @@ function whenRange(when: string | null): Pick<FeedParams, 'dateFrom' | 'dateTo'>
 const oneOf = <T extends string>(values: readonly T[], value: string | null) =>
   values.includes(value as T) ? (value as T) : undefined;
 
+// Список и карта рядом — с ширины lg (как в макете); уже — переключатель «Список / Карта».
+const WIDE_QUERY = '(min-width: 1024px)';
+
+function useWide() {
+  return useSyncExternalStore(
+    (onChange) => {
+      const query = window.matchMedia(WIDE_QUERY);
+      query.addEventListener('change', onChange);
+      return () => query.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(WIDE_QUERY).matches,
+  );
+}
+
+type View = 'list' | 'map';
+
 export function FeedPage() {
+  const me = useMe();
   const [search, setSearch] = useSearchParams();
-  const sportId = search.get('sport') ?? undefined;
-  const when = search.get('when');
+  const when = search.get('when') ?? '';
   const params: FeedParams = {
     q: search.get('q') ?? undefined,
-    sportId,
+    place: search.get('place') ?? undefined,
+    sportId: search.get('sport') ?? undefined,
     ...whenRange(when),
     joinMode: oneOf(JOIN_MODES, search.get('mode')),
     level: oneOf(EVENT_LEVELS, search.get('level')),
   };
-  const view = search.get('view') === 'map' ? 'map' : 'list';
+  const view: View = search.get('view') === 'map' ? 'map' : 'list';
   const hasFilters = [...search.keys()].some((key) => key !== 'view');
 
-  /** Поменять один параметр адреса, остальные сохранить; пустое значение убирает параметр. */
-  const setParam = (key: string, value: string | undefined) => {
+  /** Поменять параметры адреса, остальные сохранить; пустое значение убирает параметр. */
+  const setParams = (changes: Record<string, string | undefined>) => {
     setSearch(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (value) next.set(key, value);
-        else next.delete(key);
+        for (const [key, value] of Object.entries(changes)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
         return next;
       },
       { replace: true },
@@ -86,125 +108,107 @@ export function FeedPage() {
             Больше, чем спорт —{' '}
             <span className="rounded-[14px] bg-accent px-3 box-decoration-clone">это люди</span>
           </h1>
-          <p className="max-w-2xl text-lg text-ink-muted">
-            Смотрите, кто и где собирается, читайте условия и присоединяйтесь. Футбол, шахматы,
-            пробежки, зарядка во дворе — в одном месте.
+          <p className="max-w-[620px] text-lg text-ink-muted">
+            Смотрите, кто и где собирается рядом с вами, и присоединяйтесь. Не нашли своё —{' '}
+            {me.data?.role === 'admin' ? (
+              'создайте встречу сами.'
+            ) : (
+              <>
+                <Link to="/events/new">создайте встречу сами</Link>.
+              </>
+            )}
           </p>
           <SearchForm
-            key={params.q ?? ''}
-            initial={params.q ?? ''}
-            onSearch={(q) => setParam('q', q)}
+            key={`${params.q ?? ''}|${params.place ?? ''}`}
+            q={params.q ?? ''}
+            place={params.place ?? ''}
+            when={when}
+            onSearch={setParams}
           />
-          <CreateEventLink />
         </div>
         <MyRegistrations />
       </section>
 
-      <SportFilter sportId={sportId} onChange={(id) => setParam('sport', id)} />
+      <SportFilter
+        sportId={params.sportId}
+        onChange={(id) => setParams({ sport: id })}
+        canCreate={me.data?.role !== 'admin'}
+      />
 
-      <section aria-label="Фильтры" className="grid gap-4 sm:grid-cols-3">
-        <SelectField
-          label="Когда"
-          placeholder="Любая дата"
-          options={WHEN_OPTIONS}
-          value={when ?? ''}
-          onChange={(e) => setParam('when', e.target.value)}
-        />
-        <SelectField
-          label="Режим записи"
-          placeholder="Любой"
-          options={JOIN_MODES.map((value) => ({ value, label: JOIN_MODE_LABELS[value] }))}
-          value={params.joinMode ?? ''}
-          onChange={(e) => setParam('mode', e.target.value)}
-        />
-        <SelectField
-          label="Уровень"
-          placeholder="Любой"
-          options={EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_LABELS[value] }))}
-          value={params.level ?? ''}
-          onChange={(e) => setParam('level', e.target.value)}
-        />
-      </section>
+      <EventsSplit
+        params={params}
+        hasFilters={hasFilters}
+        onReset={() => setSearch({}, { replace: true })}
+        view={view}
+        onView={(next) => setParams({ view: next === 'map' ? next : undefined })}
+        onParam={(key, value) => setParams({ [key]: value })}
+      />
 
-      <ViewSwitch view={view} onChange={(next) => setParam('view', next === 'map' ? next : '')} />
-
-      {view === 'map' ? (
-        // «Место встречи» (1.10): та же подборка, что в списке, метками на карте.
-        <section aria-label="Встречи на карте" className="flex flex-col gap-3">
-          <p className="text-ink-muted">
-            Метка — встреча, цвет — вид спорта, замок — запись по заявке. {LOCAL_TIME_NOTE}.
-          </p>
-          <EventsMap filters={params} className="h-[60vh] min-h-[420px]" />
-        </section>
-      ) : (
-        <Feed
-          params={params}
-          hasFilters={hasFilters}
-          onReset={() => setSearch({}, { replace: true })}
-        />
-      )}
+      <Steps />
+      <OrgInvite />
     </div>
   );
 }
 
-/** «Список / Карта»: та же подборка списком или метками на карте. */
-function ViewSwitch({
-  view,
-  onChange,
+function SearchForm({
+  q,
+  place,
+  when,
+  onSearch,
 }: {
-  view: 'list' | 'map';
-  onChange: (view: 'list' | 'map') => void;
+  q: string;
+  place: string;
+  when: string;
+  onSearch: (changes: Record<string, string | undefined>) => void;
 }) {
-  return (
-    <div role="group" aria-label="Как показать встречи" className="flex flex-wrap gap-2.5">
-      <Chip pressed={view === 'list'} icon="all" onClick={() => onChange('list')}>
-        Список
-      </Chip>
-      <Chip pressed={view === 'map'} icon="map" index={1} onClick={() => onChange('map')}>
-        Карта
-      </Chip>
-    </div>
-  );
-}
-
-/** «Создать встречу»: участнику и организации; без входа форма сначала попросит войти. */
-function CreateEventLink() {
-  const me = useMe();
-  if (me.data?.role === 'admin') return null;
-  return (
-    <p className="flex flex-wrap items-center gap-3">
-      <span className="text-ink-muted">Не нашли подходящую встречу?</span>
-      <ButtonLink to="/events/new" variant="dark">
-        <Icon name="plus" />
-        Создать встречу
-      </ButtonLink>
-    </p>
-  );
-}
-
-function SearchForm({ initial, onSearch }: { initial: string; onSearch: (q: string) => void }) {
-  const [text, setText] = useState(initial);
+  const [text, setText] = useState(q);
+  const [where, setWhere] = useState(place);
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onSearch(text.trim());
+    onSearch({ q: text.trim() || undefined, place: where.trim() || undefined });
   };
   return (
     <form
       role="search"
       onSubmit={submit}
-      className="flex max-w-3xl flex-wrap gap-2.5 rounded-[22px] border-2 border-ink bg-surface p-2.5 shadow-md"
+      className="flex max-w-[760px] flex-col gap-2.5 rounded-[22px] border-2 border-ink bg-surface p-2.5 shadow-md"
     >
-      <label className="flex min-w-0 flex-[1_1_240px] flex-col px-3 py-1.5">
-        <span className="text-sm font-semibold text-ink-muted">Чем заняться</span>
-        <input
-          type="search"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Бег, шахматы, йога…"
-          className="bg-transparent py-0.5 text-lg outline-none placeholder:text-ink-muted"
-        />
-      </label>
-      <Button type="submit" size="lg">
+      <div className="grid sm:grid-cols-3">
+        <SearchField label="Чем заняться">
+          <input
+            type="search"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Бег, шахматы, йога…"
+            className="min-w-0 bg-transparent py-0.5 text-lg outline-none placeholder:text-ink-muted"
+          />
+        </SearchField>
+        <SearchField label="Где" divider>
+          <input
+            type="search"
+            value={where}
+            onChange={(e) => setWhere(e.target.value)}
+            placeholder="Улица, парк, площадка"
+            className="min-w-0 bg-transparent py-0.5 text-lg outline-none placeholder:text-ink-muted"
+          />
+        </SearchField>
+        <SearchField label="Когда" divider>
+          {/* Дата применяется сразу: выбор из списка не требует «Найти». */}
+          <select
+            value={when}
+            onChange={(e) => onSearch({ when: e.target.value || undefined })}
+            className="min-w-0 cursor-pointer bg-transparent py-0.5 text-lg outline-none"
+          >
+            <option value="">Любая дата</option>
+            {WHEN_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </SearchField>
+      </div>
+      <Button type="submit" size="lg" className="self-start">
         <Icon name="search" />
         Найти
       </Button>
@@ -212,18 +216,120 @@ function SearchForm({ initial, onSearch }: { initial: string; onSearch: (q: stri
   );
 }
 
-/** Чипы видов спорта, у которых есть ближайшие встречи. Повторное нажатие снимает выбор. */
+/** Поле поиска: подпись над ним, между полями — пунктир (на телефоне сверху, на широком — слева). */
+function SearchField({
+  label,
+  divider = false,
+  children,
+}: {
+  label: string;
+  divider?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <label
+      className={[
+        'flex min-w-0 flex-col rounded-md px-3 py-1.5 focus-within:outline-3 focus-within:outline-primary',
+        divider
+          ? 'rounded-none border-dashed border-line-soft max-sm:border-t-2 sm:border-l-2'
+          : '',
+      ].join(' ')}
+    >
+      <span className="text-sm font-semibold text-ink-muted">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+/** Стикер «Мои записи»: чуть повёрнут, как в макете; соседние — в разные стороны. */
+function Sticker({ index, children }: { index: number; children: ReactNode }) {
+  return (
+    <div
+      className="flex flex-col gap-1.5 rounded-lg border-2 border-ink bg-surface px-[18px] py-4 shadow-md"
+      style={{ rotate: index % 2 ? '1deg' : '-1.5deg' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+const StickerCaption = () => (
+  <span className="text-sm font-semibold text-ink-muted">Мои записи</span>
+);
+
+/** Ближайшие записи участника: статус видно сразу на главной. Гостю — приглашение войти. */
+function MyRegistrations() {
+  const me = useMe();
+  const isParticipant = me.data?.role === 'user';
+  const mine = useMyRegistrations(isParticipant, 2);
+
+  let stickers: ReactNode = null;
+  if (!me.isPending && !me.data) {
+    stickers = (
+      <Sticker index={0}>
+        <StickerCaption />
+        <p>Войдите, и здесь появятся встречи, куда вы записаны, и ответы на заявки.</p>
+        <Link to="/login" className="self-start font-semibold">
+          Войти
+        </Link>
+      </Sticker>
+    );
+  } else if (isParticipant && mine.data) {
+    stickers =
+      mine.data.items.length === 0 ? (
+        <Sticker index={0}>
+          <StickerCaption />
+          <p>Вы пока никуда не записаны. Выберите встречу ниже.</p>
+        </Sticker>
+      ) : (
+        <>
+          {mine.data.items.map((item, index) => (
+            <Sticker key={item.id} index={index}>
+              {index === 0 && <StickerCaption />}
+              <div className="flex flex-wrap items-center justify-between gap-2.5 font-semibold">
+                <Link to={`/events/${item.id}`} className="min-w-0 no-underline hover:underline">
+                  {item.title} · {formatShort(item.startsAt)}
+                </Link>
+                {item.status === 'published' ? (
+                  <StatusBadge kind="registration" status={item.myRegistration.status} />
+                ) : (
+                  <StatusBadge kind="event" status={item.status} />
+                )}
+              </div>
+            </Sticker>
+          ))}
+          <Link to="/me/events" className="self-end font-semibold">
+            Все мои мероприятия →
+          </Link>
+        </>
+      );
+  }
+  if (!stickers) return null;
+  return (
+    <aside aria-label="Мои записи" className="flex min-w-0 flex-[1_1_320px] flex-col gap-3">
+      {stickers}
+    </aside>
+  );
+}
+
+/** Чипы видов спорта с ближайшими встречами и «Своё направление» — создать встречу с новым видом. */
 function SportFilter({
   sportId,
   onChange,
+  canCreate,
 }: {
   sportId: string | undefined;
   onChange: (id: string | undefined) => void;
+  canCreate: boolean;
 }) {
   const sports = useSports({ withEvents: true });
-  if (!sports.data?.length) return null;
+  if (!sports.data) return null;
   return (
-    <section aria-label="Виды спорта" className="flex flex-wrap gap-3">
+    <section
+      aria-label="Виды спорта"
+      // На телефоне — одна строка с прокруткой: столбик чипов занимал бы пол-экрана.
+      className="-mx-6 flex gap-3 overflow-x-auto px-6 pt-1 pb-3 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0"
+    >
       <Chip pressed={!sportId} icon="all" onClick={() => onChange(undefined)}>
         Все
       </Chip>
@@ -236,126 +342,384 @@ function SportFilter({
           onClick={() => onChange(sport.id === sportId ? undefined : sport.id)}
         />
       ))}
+      {canCreate && (
+        <Link
+          to="/events/new?sport=custom"
+          aria-label="Своё направление: создать встречу с новым видом спорта"
+          className="inline-flex min-h-[var(--control-height)] items-center gap-2 rounded-md border-2 border-ink bg-surface pr-[18px] pl-[7px] text-sm font-semibold no-underline transition-[translate] duration-100 hover:-translate-y-px hover:text-ink"
+        >
+          <span className="inline-flex size-[34px] items-center justify-center rounded-[11px] border-2 border-ink bg-surface">
+            <Icon name="plus" size={19} />
+          </span>
+          Своё направление
+        </Link>
+      )}
     </section>
   );
 }
 
-/** Ближайшие записи участника: статус видно сразу на главной, без перехода в профиль. */
-function MyRegistrations() {
-  const me = useMe();
-  const isParticipant = me.data?.role === 'user';
-  const mine = useMyRegistrations(isParticipant);
-  if (!isParticipant || !mine.data) return null;
-
-  return (
-    <aside aria-label="Мои записи" className="flex min-w-0 flex-[1_1_320px] flex-col gap-3">
-      <Card className="flex rotate-[-1.5deg] flex-col gap-3 p-5">
-        <h2 className="text-h3">Мои записи</h2>
-        {mine.data.items.length === 0 ? (
-          <p className="text-ink-muted">Вы пока никуда не записаны. Выберите встречу ниже.</p>
-        ) : (
-          <ul className="flex flex-col gap-3">
-            {mine.data.items.map((item) => (
-              <li key={item.id} className="flex flex-col gap-1">
-                <Link to={`/events/${item.id}`} className="font-semibold">
-                  {item.title}
-                </Link>
-                <span className="text-sm text-ink-muted">
-                  {formatWhen(item.startsAt, item.endsAt)}
-                </span>
-                <span>
-                  {item.status === 'published' ? (
-                    <StatusBadge kind="registration" status={item.myRegistration.status} />
-                  ) : (
-                    <StatusBadge kind="event" status={item.status} />
-                  )}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </aside>
-  );
-}
-
-function Feed({
+/** Список «Рядом с вами» и карта той же подборки; «На карте» и клик по метке связывают их. */
+function EventsSplit({
   params,
   hasFilters,
   onReset,
+  view,
+  onView,
+  onParam,
 }: {
   params: FeedParams;
   hasFilters: boolean;
   onReset: () => void;
+  view: View;
+  onView: (view: View) => void;
+  onParam: (key: string, value: string | undefined) => void;
 }) {
-  const feed = useFeed(params);
+  const wide = useWide();
+  const [selectedId, setSelectedId] = useState<string>();
+  const [focus, setFocus] = useState<MapFocus>();
 
-  const heading = (
-    <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <h2 className="text-h2">Ближайшие встречи</h2>
-      <span className="text-sm text-ink-muted">
-        {feed.data ? `Найдено: ${feed.data.pages[0].total}. ` : ''}
-        {LOCAL_TIME_NOTE}
-      </span>
-    </div>
-  );
+  const showOnMap = (event: EventListItem) => {
+    if (event.lat === null || event.lng === null) return;
+    setSelectedId(event.id);
+    setFocus({ id: event.id, lat: event.lat, lng: event.lng, key: Date.now() });
+    if (!wide) onView('map');
+  };
+  const selectFromMap = (id: string) => {
+    setSelectedId(id);
+    document.getElementById(`feed-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  };
 
-  if (feed.isPending) {
-    return (
-      <section className="flex flex-col gap-4">
-        {heading}
-        <SkeletonList count={4} />
-      </section>
-    );
-  }
-  if (feed.isError) {
-    return (
-      <section className="flex flex-col gap-4">
-        {heading}
-        <ErrorState error={feed.error} onRetry={() => feed.refetch()} />
-      </section>
-    );
-  }
-
-  const events = feed.data.pages.flatMap((page) => page.items);
   return (
-    <section className="flex flex-col gap-4" aria-busy={feed.isFetching || undefined}>
-      {heading}
-      {events.length === 0 ? (
-        <EmptyState
-          title={hasFilters ? 'По этим условиям встреч нет' : 'Пока нет встреч'}
-          text={
-            hasFilters
-              ? 'Попробуйте другую дату или вид спорта.'
-              : 'Скоро здесь появятся встречи соседей, клубов и сообществ.'
-          }
-          action={
-            hasFilters ? (
-              <Button variant="secondary" onClick={onReset}>
-                Сбросить фильтры
-              </Button>
-            ) : (
-              <ButtonLink to="/events/new">Создать встречу</ButtonLink>
-            )
-          }
-        />
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {events.map((event) => (
-            <EventCard key={event.id} event={event} />
-          ))}
+    <section aria-label="Встречи" className="flex flex-col gap-5">
+      {!wide && (
+        <div role="group" aria-label="Как показать встречи" className="flex gap-2">
+          <Button variant={view === 'list' ? 'dark' : 'secondary'} onClick={() => onView('list')}>
+            Список
+          </Button>
+          <Button variant={view === 'map' ? 'dark' : 'secondary'} onClick={() => onView('map')}>
+            Карта
+          </Button>
         </div>
       )}
-      {feed.hasNextPage && (
-        <Button
-          variant="secondary"
-          className="self-center"
-          loading={feed.isFetchingNextPage}
-          onClick={() => feed.fetchNextPage()}
-        >
-          Показать ещё
-        </Button>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+        {(wide || view === 'list') && (
+          <EventList
+            params={params}
+            hasFilters={hasFilters}
+            onReset={onReset}
+            onParam={onParam}
+            selectedId={selectedId}
+            onShowOnMap={showOnMap}
+          />
+        )}
+        {(wide || view === 'map') && (
+          <div className="flex min-w-0 flex-col gap-2">
+            <EventsMap
+              filters={params}
+              selectedId={selectedId}
+              onSelect={selectFromMap}
+              focus={focus}
+              className="h-[70vh] min-h-[420px] lg:h-[780px]"
+            />
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+              <span className="flex flex-wrap items-center gap-3 font-semibold">
+                Цвет — вид спорта
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex size-[22px] items-center justify-center rounded-full bg-ink text-white">
+                    <Icon name="lock" size={12} strokeWidth={2.6} />
+                  </span>
+                  по заявке
+                </span>
+              </span>
+              <Link to="/map" className="font-semibold">
+                Большая карта с площадками →
+              </Link>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function EventList({
+  params,
+  hasFilters,
+  onReset,
+  onParam,
+  selectedId,
+  onShowOnMap,
+}: {
+  params: FeedParams;
+  hasFilters: boolean;
+  onReset: () => void;
+  onParam: (key: string, value: string | undefined) => void;
+  selectedId: string | undefined;
+  onShowOnMap: (event: EventListItem) => void;
+}) {
+  const feed = useFeed(params);
+  const total = feed.data?.pages[0].total;
+  const events = feed.data?.pages.flatMap((page) => page.items) ?? [];
+
+  let body: ReactNode;
+  if (feed.isPending) body = <SkeletonList count={3} />;
+  else if (feed.isError) body = <ErrorState error={feed.error} onRetry={() => feed.refetch()} />;
+  else if (events.length === 0) {
+    body = (
+      <EmptyState
+        title={hasFilters ? 'По этим условиям встреч нет' : 'Пока нет встреч'}
+        text={
+          hasFilters
+            ? 'Попробуйте другую дату, место или вид спорта.'
+            : 'Создайте свою — соседи увидят её на карте.'
+        }
+        action={
+          hasFilters ? (
+            <Button variant="secondary" onClick={onReset}>
+              Сбросить фильтры
+            </Button>
+          ) : (
+            <ButtonLink to="/events/new">Создать встречу</ButtonLink>
+          )
+        }
+      />
+    );
+  } else {
+    body = (
+      <>
+        {events.map((event) => (
+          <FeedItem
+            key={event.id}
+            event={event}
+            selected={event.id === selectedId}
+            onShowOnMap={() => onShowOnMap(event)}
+          />
+        ))}
+        {feed.hasNextPage && (
+          <Button
+            variant="secondary"
+            className="self-center"
+            loading={feed.isFetchingNextPage}
+            onClick={() => feed.fetchNextPage()}
+          >
+            Показать ещё
+          </Button>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-display text-[26px] leading-tight font-bold">Рядом с вами</h2>
+        {total !== undefined && (
+          <span className="text-sm text-ink-muted">
+            {plural(total, ['встреча', 'встречи', 'встреч'])}
+          </span>
+        )}
+      </div>
+      <p className="text-sm text-ink-muted">{LOCAL_TIME_NOTE}</p>
+      <div className="grid grid-cols-2 gap-3">
+        <SelectField
+          label="Режим записи"
+          placeholder="Любой"
+          options={JOIN_MODES.map((value) => ({ value, label: JOIN_MODE_LABELS[value] }))}
+          value={params.joinMode ?? ''}
+          onChange={(e) => onParam('mode', e.target.value)}
+        />
+        <SelectField
+          label="Уровень"
+          placeholder="Любой"
+          options={EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_LABELS[value] }))}
+          value={params.level ?? ''}
+          onChange={(e) => onParam('level', e.target.value)}
+        />
+      </div>
+      <div
+        aria-busy={feed.isFetching || undefined}
+        // Отступ справа и снизу — под жёсткую тень карточек, иначе прокрутка её обрезает.
+        className="flex flex-col gap-3.5 lg:max-h-[600px] lg:overflow-y-auto lg:pr-2.5 lg:pb-2.5"
+      >
+        {body}
+      </div>
+    </div>
+  );
+}
+
+/** Карточка в списке рядом с картой: что, когда, где, режим, «На карте» и действие. */
+function FeedItem({
+  event,
+  selected,
+  onShowOnMap,
+}: {
+  event: EventListItem;
+  selected: boolean;
+  onShowOnMap: () => void;
+}) {
+  const href = `/events/${event.id}`;
+  const onMap = event.lat !== null && event.lng !== null;
+  return (
+    <article
+      id={`feed-${event.id}`}
+      className={`flex scroll-m-2 gap-3.5 rounded-lg border-2 border-ink p-3.5 ${selected ? 'bg-accent shadow-md' : 'bg-surface shadow-sm'}`}
+    >
+      <SportTile sport={event.sport} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="font-display text-[19px] leading-snug font-bold">
+            <Link to={href} className="no-underline hover:underline">
+              {event.title}
+            </Link>
+          </h3>
+          <JoinModeBadge mode={event.joinMode} />
+        </div>
+        <p className="text-sm text-ink-muted">{formatWhen(event.startsAt, event.endsAt)}</p>
+        <p className="text-sm text-ink-muted">{event.address}</p>
+        <p className="text-sm text-ink-muted">
+          Организатор: <OrganizerLink organizer={event.organizer} />
+        </p>
+        <p className="text-sm text-ink-muted">
+          {EVENT_LEVEL_LABELS[event.level]} · {formatSeats(event.participantsCount, event.capacity)}
+        </p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+          {onMap ? (
+            <Button
+              variant="secondary"
+              onClick={onShowOnMap}
+              aria-label={`${event.title} на карте`}
+            >
+              <Icon name="pin" size={16} />
+              На карте
+            </Button>
+          ) : (
+            <span />
+          )}
+          <FeedAction event={event} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
+/**
+ * Действие в карточке. Свободная запись — сразу из списка; по заявке — на странице события,
+ * где можно написать сообщение. Права всё равно проверяет сервер, ответ показываем под кнопкой.
+ */
+function FeedAction({ event }: { event: EventListItem }) {
+  const me = useMe();
+  const navigate = useNavigate();
+  const join = useJoinEvent(event.id);
+  const href = `/events/${event.id}`;
+  const role = me.data?.role;
+
+  if (event.myRegistration) {
+    return <StatusBadge kind="registration" status={event.myRegistration.status} />;
+  }
+  const own = event.organizer.type === 'user' && event.organizer.id === me.data?.id;
+  if (own || (role && role !== 'user')) {
+    return (
+      <ButtonLink to={href} variant="secondary">
+        {own ? 'Ваша встреча' : 'Подробнее'}
+      </ButtonLink>
+    );
+  }
+  if (event.freeSlots === 0) {
+    return (
+      <ButtonLink to={href} variant="secondary" aria-label={`Мест нет: ${event.title}`}>
+        Мест нет
+      </ButtonLink>
+    );
+  }
+  if (event.joinMode === 'request') {
+    return (
+      <ButtonLink to={href} variant="dark">
+        Подать заявку
+      </ButtonLink>
+    );
+  }
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Button
+        loading={join.isPending}
+        onClick={() =>
+          me.data ? join.mutate(null) : navigate(`/login?next=${encodeURIComponent(href)}`)
+        }
+      >
+        Записаться
+      </Button>
+      {join.error && (
+        <p role="alert" className="text-sm font-semibold">
+          {join.error instanceof ApiError
+            ? join.error.message
+            : 'Не получилось. Попробуйте ещё раз'}
+        </p>
       )}
+    </div>
+  );
+}
+
+const STEPS = [
+  {
+    color: 'var(--sport-1)',
+    title: 'Выберите занятие',
+    text: 'Из списка или своё — даже самое редкое.',
+  },
+  {
+    color: 'var(--sport-3)',
+    title: 'Найдите на карте',
+    text: 'Встречи рядом, условия и организатор — в одном окне.',
+  },
+  {
+    color: 'var(--sport-2)',
+    title: 'Присоединяйтесь',
+    text: 'Сразу или по заявке — статус всегда в «Моих мероприятиях».',
+  },
+];
+
+function Steps() {
+  return (
+    <section
+      aria-label="Как это работает"
+      className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]"
+    >
+      {STEPS.map((step, index) => (
+        <div
+          key={step.title}
+          className="flex flex-col gap-2 rounded-lg border-2 border-ink bg-surface p-6"
+        >
+          <span
+            aria-hidden="true"
+            className="inline-flex size-12 items-center justify-center rounded-full border-2 border-ink font-display text-[22px] font-bold"
+            style={{ background: step.color }}
+          >
+            {index + 1}
+          </span>
+          <h3 className="text-h3">{step.title}</h3>
+          <p className="text-ink-muted">{step.text}</p>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+/** «Клуб или сообщество?» — гостю регистрация организации, организации — её кабинет. */
+function OrgInvite() {
+  const me = useMe();
+  const role = me.data?.role;
+  if (me.isPending || (role && role !== 'organization')) return null;
+  return (
+    <section className="mb-6 flex flex-wrap items-center justify-between gap-6 rounded-xl border-2 border-ink bg-status-request p-6 shadow-lg md:p-9">
+      <div className="min-w-0 flex-[1_1_440px]">
+        <h2 className="text-h2 mb-2">Клуб или сообщество?</h2>
+        <p className="text-lg">
+          Заведите страницу организации. После одобрения администратором ваши встречи сразу появятся
+          на карте.
+        </p>
+      </div>
+      <ButtonLink to={role ? '/org' : '/register'} variant="secondary" size="lg">
+        {role ? 'Кабинет организации' : 'Подать заявку'}
+      </ButtonLink>
     </section>
   );
 }
