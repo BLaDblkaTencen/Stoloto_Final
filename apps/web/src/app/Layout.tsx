@@ -13,7 +13,8 @@ export function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="page-container flex flex-wrap items-center justify-between gap-4 py-5">
-        <Link to="/" className="flex items-center gap-2.5 no-underline">
+        {/* Логотип не перекрашивается при наведении, как обычные ссылки (a:hover в index.css). */}
+        <Link to="/" className="flex items-center gap-2.5 no-underline hover:text-ink">
           <span
             aria-hidden="true"
             className="inline-flex size-11 items-center justify-center rounded-[14px] border-2 border-ink bg-accent font-display text-[22px] font-bold shadow-sm"
