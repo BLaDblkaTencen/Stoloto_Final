@@ -6,11 +6,11 @@
 
 - Поля JSON — `camelCase`, как в схеме Drizzle и TypeScript (`startsAt`, `joinMode`). Идентификаторы — UUID строкой.
 - Время в API — ISO 8601 в UTC (`2026-10-26T01:00:00.000Z`). Интерфейс показывает его в поясе города демо-данных `Asia/Krasnoyarsk` с подписью «по местному времени», а не в поясе браузера: эксперт из Москвы должен видеть то же время, что и организатор.
-- Списки: `{ items: T[], total: number }`, параметры `page` (с 1) и `pageSize` (по умолчанию 20, максимум 50).
+- Списки: `{ items: T[], total: number }`, параметры `limit` (1–50, по умолчанию 20) и `offset`, как в [organizations.md](organizations.md).
 - **Смотреть можно без входа:** лента, карточка опубликованного события, обсуждение, профиль. Записаться, написать комментарий, создать событие — только после входа (иначе 401).
-- Свои коды ошибок — в таблице в конце. Общие (`UNAUTHORIZED`, `FORBIDDEN`, `NOT_FOUND`, `VALIDATION_ERROR`) — по [../api.md](../api.md).
+- Свои коды ошибок — в таблице в конце. Общие (`UNAUTHORIZED`, `FORBIDDEN`, `VALIDATION_ERROR`) — по [../api.md](../api.md).
 
-> Решения по умолчанию, которые может поменять капитан: просмотр без входа, время по Красноярску, прошедшие события скрыты из ленты, запись только для роли `user`.
+> Решения по умолчанию, которые может поменять капитан: просмотр без входа, время по Красноярску, прошедшие события скрыты из ленты, записываться может только роль `user`.
 
 ## Общие типы
 
@@ -37,6 +37,7 @@ type EventListItem = {
   startsAt: string;
   endsAt: string | null;
   address: string;
+  venueId: string | null;
   lat: number | null;
   lng: number | null;
   joinMode: 'free' | 'request';
@@ -48,12 +49,17 @@ type EventListItem = {
   myRegistration: MyRegistration;
 };
 
+// Компактная метка для карты событий (участник 2): GET /api/events?view=map
+type EventMapItem = Pick<
+  EventListItem,
+  'id' | 'title' | 'startsAt' | 'joinMode' | 'lat' | 'lng' | 'venueId' | 'participantsCount' | 'capacity'
+> & { sportId: string };
+
 type EventDetails = EventListItem & {
   description: string;
   placeNotes: string | null;
   requirements: string | null;
-  venueId: string | null;
-  venue: VenueCard | null; // форма — в api/organizations.md (участник 2)
+  venue: Venue | null; // форма — в organizations.md (участник 2), раздел 3
   status: 'published' | 'unpublished' | 'deleted';
   moderationReason: string | null; // только при status ≠ published
   isPast: boolean;
@@ -63,13 +69,14 @@ type EventDetails = EventListItem & {
   participants: { id: string; name: string }[] | null;
   // Что можно мне — считает сервер, интерфейс только показывает.
   permissions: {
+    isOrganizer: boolean;
     canEdit: boolean;
     canJoin: boolean;
     canCancel: boolean;
     canComment: boolean;
-    isOrganizer: boolean;
   };
-  joinUnavailableReason: string | null; // текст для кнопки, если canJoin = false: «Мест нет», «Событие прошло»
+  // Почему нельзя записаться (если canJoin = false): код из таблицы ошибок и текст для кнопки.
+  joinBlock: { code: string; message: string } | null;
 };
 ```
 
@@ -77,31 +84,34 @@ type EventDetails = EventListItem & {
 
 | Метод | Путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/sports` | все | `?q=` — поиск по названию для подсказок; `?withEvents=true` — только виды с предстоящими опубликованными событиями (для чипов в ленте) | `{ items: Sport[] }`: сначала стартовый список, потом добавленные пользователями, по алфавиту | — |
+| GET | `/api/sports` | все | `?q=` — поиск по названию для подсказок; `?withEvents=true` — только виды с предстоящими опубликованными событиями (для чипов в ленте) | `{ items: Sport[] }`: сначала стартовый список, потом добавленные пользователями, по алфавиту | 422 |
 
-«Свой вариант» отдельным запросом не создаётся: его присылают в теле создания события полем `sportName`. Сервер нормализует название по DATA_MODEL (пробелы, регистр, `ё`→`е`), находит существующий вид спорта с тем же `slug` или создаёт новый с `isCustom = true`. Правка кода не нужна, новый вид сразу появляется в `GET /api/sports`.
+«Свой вариант» отдельным запросом не создаётся: его присылают в теле создания события полем `sportName`. Сервер нормализует название по DATA_MODEL (пробелы, регистр, `ё`→`е`, знаки препинания), находит существующий вид спорта с тем же `slug` или создаёт новый с `isCustom = true`. Правка кода не нужна, новый вид сразу появляется в `GET /api/sports`.
 
 ## Мероприятия (`events`, задачи 1.2–1.5)
 
 | Метод | Путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/events` | все | см. «Фильтры ленты» | `{ items: EventListItem[], total }`, только `published`, по возрастанию `startsAt` | 422 — неверный фильтр |
-| GET | `/api/events/:id` | все | — | `EventDetails` | 404 `EVENT_UNAVAILABLE` — снято или удалено, а я не организатор, не записан и не админ; 404 `NOT_FOUND` — нет такого |
-| POST | `/api/events` | `user`, `organization` | `EventInput` | 201 `EventDetails` | 401; 403 — админ; 403 `ORG_NOT_APPROVED`; 422 по полям |
-| PATCH | `/api/events/:id` | автор события | часть полей `EventInput` | `EventDetails` | 403 — не автор; 409 `EVENT_UNAVAILABLE`; 409 `EVENT_PAST`; 409 `CAPACITY_BELOW_PARTICIPANTS`; 409 `JOIN_MODE_LOCKED`; 422 |
+| GET | `/api/events` | все | см. «Фильтры ленты» | `{ items: EventListItem[], total }`, только `published`, по возрастанию `startsAt`; при `view=map` — `{ items: EventMapItem[], total }` | 422 |
+| GET | `/api/events/mine` | `user`, `organization` | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { status; moderationReason; pendingCount: number })[], total }` — события, которые я организую, включая снятые, со счётчиком ожидающих заявок | 401; 403 |
+| GET | `/api/events/:id` | все | — | `EventDetails` | 404 `EVENT_NOT_FOUND`; 404 `EVENT_UNAVAILABLE` — снято или удалено, а я не организатор, не записан и не админ |
+| POST | `/api/events` | `user`, `organization` | `EventInput` | 201 `EventDetails` | 401; 403; ошибки проверки организации; 422 по полям |
+| PATCH | `/api/events/:id` | автор события | часть полей `EventInput` | `EventDetails` | 401; 403 `NOT_EVENT_AUTHOR`; 404; 409 `EVENT_UNAVAILABLE`, `EVENT_PAST`, `CAPACITY_BELOW_PARTICIPANTS`, `JOIN_MODE_LOCKED`; 422 |
 
 **Фильтры ленты** (`GET /api/events`), все необязательные:
 
 | Параметр | Значение |
 | --- | --- |
-| `q` | поиск по названию и описанию: полнотекстовый (русская морфология), плюс совпадение по началу слова, чтобы «фут» находил «Футбол» |
-| `sport` | id вида спорта, можно несколько через запятую |
-| `dateFrom`, `dateTo` | `YYYY-MM-DD`, границы дня — по Красноярску |
+| `q` | поиск по названию, описанию и виду спорта: полнотекстовый (русская морфология) и по части слова, чтобы «фут» находил «Футбол» |
+| `sportId` | id вида спорта, можно несколько через запятую |
+| `organizationId` | события организации (её страница у участника 2) |
+| `date` | `YYYY-MM-DD` — события одного дня; или диапазон `dateFrom`, `dateTo`. Границы дня — по Красноярску |
 | `joinMode` | `free` / `request` |
 | `level` | `any` / `beginner` / `amateur` / `pro` |
-| `bbox` | `minLng,minLat,maxLng,maxLat` — только события с точкой внутри области (для карты участника 2) |
+| `bbox` | `minLng,minLat,maxLng,maxLat` — только события с точкой внутри области |
 | `includePast` | `true` — показать и прошедшие; по умолчанию прошедшие скрыты |
-| `page`, `pageSize` | см. «Соглашения» |
+| `view` | `list` (по умолчанию) или `map` — компактные метки для карты, `limit` до 500 |
+| `limit`, `offset` | см. «Соглашения» |
 
 **`EventInput`** (создание; при правке те же поля, все необязательные):
 
@@ -112,9 +122,9 @@ type EventDetails = EventListItem & {
 | `sportId` **или** `sportName` | ровно одно из двух; `sportName` — свой вариант, 2–40 символов |
 | `startsAt` | в будущем |
 | `endsAt` | необязательно, позже `startsAt` |
-| `address` | 3–300 символов; обязателен всегда, даже если выбрана площадка |
-| `venueId` | необязательно; площадку проверяет модуль `venues` (участник 2), сервер подставляет её `lat`/`lng`, адрес можно поправить |
-| `lat`, `lng` | необязательно, только парой; своя точка на карте |
+| `address` | 3–300 символов. Обязателен, если не выбрана площадка; с площадкой можно не указывать — подставится её адрес |
+| `venueId` | необязательно; сервер подставляет `lat`, `lng` площадки (и адрес, если он не введён) |
+| `lat`, `lng` | необязательно, только парой; своя точка на карте без площадки |
 | `placeNotes` | до 300 символов: как найти, вход, этаж |
 | `joinMode` | `free` / `request` |
 | `level` | по умолчанию `any` |
@@ -122,7 +132,7 @@ type EventDetails = EventListItem & {
 | `capacity` | 1–10000 или `null` — без ограничения |
 | `chatUrl` | ссылка `http(s)://` на внешний чат, необязательно |
 
-**Создание от имени организации.** Если автор — аккаунт `organization`, сервер сам ставит `organizationId` его организации и вызывает проверку модуля `organizations` (участник 2): организация есть и `approved`. Иначе 403 `ORG_NOT_APPROVED`. Поля выбора организатора в запросе нет. Событие публикуется сразу (`status = published`).
+**Создание от имени организации.** Если автор — аккаунт `organization`, сервер вызывает `resolvePublishingOrganization` модуля `organizations` (участник 2) и ставит полученный `organizationId`. Ошибки этой проверки (`ORG_NOT_FOUND`, `ORG_NOT_APPROVED` с причиной отказа) пробрасываются как есть. Поля выбора организатора в запросе нет, `organizationId` из тела не принимается. Событие публикуется сразу (`status = published`).
 
 **Правка** — только автор и только опубликованного предстоящего события. Нельзя уменьшить `capacity` ниже числа подтверждённых участников и нельзя сменить `joinMode`, если есть подтверждённые или ожидающие записи: иначе у людей молча поменялись бы условия.
 
@@ -132,9 +142,9 @@ type EventDetails = EventListItem & {
 
 | Метод | Путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- | --- |
-| POST | `/api/events/:id/registration` | `user` | `{ message?: string }` — до 500 символов, только для режима «по заявке» | 200 `MyRegistration`: `confirmed` при `free`, `pending` при `request` | 401; 403 — не `user`; 404; 409 `EVENT_UNAVAILABLE`, `EVENT_PAST`, `OWN_EVENT`, `EVENT_FULL`, `ALREADY_REGISTERED`, `REGISTRATION_REJECTED` |
+| POST | `/api/events/:id/registration` | `user` | `{ message?: string }` — до 500 символов, только для режима «по заявке» | 200 `MyRegistration`: `confirmed` при `free`, `pending` при `request` | 401; 403; 404; 409 `EVENT_UNAVAILABLE`, `EVENT_PAST`, `OWN_EVENT`, `EVENT_FULL`, `ALREADY_REGISTERED`, `REGISTRATION_REJECTED` |
 | DELETE | `/api/events/:id/registration` | `user` | — | 200 `MyRegistration` со статусом `cancelled` | 401; 404; 409 `NOT_REGISTERED`, `EVENT_PAST` |
-| GET | `/api/me/registrations` | вошедший | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { myRegistration: NonNullable<MyRegistration>; status; moderationReason })[], total }` — включая снятые, чтобы человек видел «Публикация недоступна» | 401 |
+| GET | `/api/registrations/mine` | `user` | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { status; moderationReason })[], total }`; у каждого заполнен `myRegistration`. Снятые тоже, чтобы человек видел «Публикация недоступна» | 401; 403 |
 
 - Повторная запись после отмены меняет статус той же строки (`cancelled` → `confirmed` / `pending`), новой записи не создаёт. После отказа (`rejected`) записаться снова нельзя.
 - Проверка мест и запись идут в одной транзакции с `SELECT … FOR UPDATE` на строке события: два человека не займут последнее место.
@@ -142,7 +152,7 @@ type EventDetails = EventListItem & {
 
 ### Сервис для панели организатора (участник 2, задача 2.7)
 
-Панель вызывает функции модуля напрямую, а не HTTP и не свой SQL. Файл: `apps/api/src/modules/registrations/service.ts`.
+Панель вызывает функции модуля напрямую, а не HTTP и не свой SQL. Сигнатуры — как просил участник 2 в [organizations.md](organizations.md), раздел 2. Файл: `apps/api/src/modules/registrations/service.ts`.
 
 ```ts
 type OrganizerRegistration = {
@@ -151,21 +161,28 @@ type OrganizerRegistration = {
   message: string | null;
   createdAt: string;
   decidedAt: string | null;
-  user: { id: string; name: string };
+  user: { id: string; name: string; avatarUrl: string | null; about: string | null };
 };
 
-/** Все записи события для его автора: подтверждённые, ожидающие, отклонённые, отменённые. */
-listForOrganizer(eventId: string, actor: SessionUser): Promise<OrganizerRegistration[]>;
+/** Записи события для его автора: сначала pending, затем новее. */
+listRegistrationsForAuthor(
+  db: Db,
+  args: { eventId: string; actorId: string; status?: RegistrationStatus },
+): Promise<{
+  items: OrganizerRegistration[];
+  counts: Record<RegistrationStatus, number>;
+  capacity: number | null;
+}>;
 
 /** Принять или отклонить заявку. */
-decide(
-  registrationId: string,
-  decision: 'confirm' | 'reject',
-  actor: SessionUser,
+decideRegistration(
+  db: Db,
+  args: { eventId: string; registrationId: string; actorId: string; decision: 'confirm' | 'reject' },
 ): Promise<OrganizerRegistration>;
 ```
 
-Правила `decide` (ошибки — `AppError`, панель их просто пробрасывает):
+Правила (ошибки — `AppError`, панель их просто пробрасывает):
+- нет события или записи в этом событии: 404 `EVENT_NOT_FOUND` / `REGISTRATION_NOT_FOUND`;
 - решает только автор события (`created_by`); у события организации это её представитель. Админ не решает: 403 `NOT_EVENT_AUTHOR`;
 - только из `pending`: иначе 409 `NOT_PENDING`;
 - событие опубликовано и не прошло: иначе 409 `EVENT_UNAVAILABLE` / `EVENT_PAST`;
@@ -176,8 +193,8 @@ decide(
 
 | Метод | Путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/events/:id/comments` | все, кто видит событие | — | `{ items: Comment[] }`: корневые по времени, в каждом `replies` по времени | 404 / 404 `EVENT_UNAVAILABLE` — как у карточки |
-| POST | `/api/events/:id/comments` | вошедший | `{ text: string; parentId?: string }` | 201 `Comment` | 401; 409 `EVENT_UNAVAILABLE`; 422 — пустой или длинный текст, чужой `parentId` |
+| GET | `/api/events/:id/comments` | все, кто видит событие | — | `{ items: Comment[] }`: корневые по времени, в каждом `replies` по времени | 404 — как у карточки |
+| POST | `/api/events/:id/comments` | вошедший | `{ text: string; parentId?: string }` | 201 `Comment` | 401; 404; 409 `EVENT_UNAVAILABLE`; 422 — пустой или длинный текст, чужой `parentId` |
 
 ```ts
 type Comment = {
@@ -201,13 +218,12 @@ type Comment = {
 - Писать может любой вошедший, в том числе не записанный (ТЗ). Под снятым или удалённым событием писать нельзя.
 - Скрытие комментария — модуль `admin` (участник 3, задача 3.6), здесь только показ заглушки.
 
-## Профиль и «Мои мероприятия» (`profiles`, задачи 1.7, 1.9)
+## Профиль (`profiles`, задача 1.9)
 
 | Метод | Путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- | --- |
-| GET | `/api/users/:id` | все | — | `{ id, name, about, city, sports: Sport[], upcomingEvents: EventListItem[] }` — события, которые человек организует | 404 |
-| PATCH | `/api/me/profile` | вошедший | `{ name?, about?, city?, sportIds?: string[] }` | профиль как в `GET /api/users/:id` | 401; 422 |
-| GET | `/api/me/events` | вошедший | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { status; moderationReason; pendingCount: number })[], total }` — события, которые я организую, со счётчиком ожидающих заявок | 401 |
+| GET | `/api/users/:id` | все | — | `{ id, name, about, city, sports: Sport[], upcomingEvents: EventListItem[] }` — события, которые человек организует | 404 `USER_NOT_FOUND` |
+| PATCH | `/api/users/me` | вошедший | `{ name?, about?, city?, sportIds?: string[] }` | профиль как в `GET /api/users/:id` | 401; 422 |
 
 Email и пароль здесь не меняются (вход — модуль `auth`, участник 3).
 
@@ -215,6 +231,7 @@ Email и пароль здесь не меняются (вход — модул�
 
 | `code` | HTTP | Сообщение для человека |
 | --- | --- | --- |
+| `EVENT_NOT_FOUND` | 404 | «Событие не найдено» |
 | `EVENT_UNAVAILABLE` | 404 / 409 | «Событие недоступно» (не видно) / «Публикация недоступна, записаться нельзя» |
 | `EVENT_PAST` | 409 | «Событие уже прошло» |
 | `OWN_EVENT` | 409 | «Это ваше событие: вы его организатор» |
@@ -222,11 +239,13 @@ Email и пароль здесь не меняются (вход — модул�
 | `ALREADY_REGISTERED` | 409 | «Вы уже записаны» / «Заявка уже отправлена» |
 | `REGISTRATION_REJECTED` | 409 | «Организатор отклонил вашу заявку» |
 | `NOT_REGISTERED` | 409 | «Вы не записаны на это событие» |
+| `REGISTRATION_NOT_FOUND` | 404 | «Заявка не найдена» |
 | `NOT_PENDING` | 409 | «Заявка уже рассмотрена» |
-| `NOT_EVENT_AUTHOR` | 403 | «Заявки рассматривает только организатор события» |
+| `NOT_EVENT_AUTHOR` | 403 | «Это может сделать только организатор события» |
 | `CAPACITY_BELOW_PARTICIPANTS` | 409 | «Уже записано больше людей, чем новый лимит» |
 | `JOIN_MODE_LOCKED` | 409 | «Режим записи нельзя менять, когда уже есть записи» |
-| `ORG_NOT_APPROVED` | 403 | код и текст — модуля `organizations` (участник 2) |
+| `USER_NOT_FOUND` | 404 | «Пользователь не найден» |
+| `ORG_NOT_FOUND`, `ORG_NOT_APPROVED`, `VENUE_NOT_FOUND` | 404 / 403 / 422 | коды и тексты модулей участника 2 |
 
 ## Страницы интерфейса зоны
 
