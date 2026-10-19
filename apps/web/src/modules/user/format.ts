@@ -66,3 +66,27 @@ export function formatSeats(participants: number, capacity: number | null) {
     ? `Участвуют ${participants} из ${capacity}, мест нет`
     : `Участвуют ${participants} из ${capacity}, свободно ${plural(free, ['место', 'места', 'мест'])}`;
 }
+
+// Красноярск живёт по UTC+7 круглый год (переходов на летнее время нет с 2014 года),
+// поэтому смещение постоянное и дату с временем из формы можно перевести в UTC без библиотек.
+const EVENT_UTC_OFFSET = '+07:00';
+
+/** Дата и время из полей формы (по Красноярску) → ISO в UTC для API; '' — если поле пустое. */
+export function toUtcIso(date: string, time: string) {
+  if (!date || !time) return '';
+  const value = new Date(`${date}T${time}:00${EVENT_UTC_OFFSET}`);
+  return Number.isNaN(value.getTime()) ? '' : value.toISOString();
+}
+
+const timeOfDayFormat = new Intl.DateTimeFormat('en-GB', {
+  timeZone: EVENT_TIMEZONE,
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
+/** ISO из API → поля формы: { date: '2026-10-26', time: '19:00' } по Красноярску. */
+export function localParts(iso: string) {
+  const date = new Date(iso);
+  return { date: isoDayFormat.format(date), time: timeOfDayFormat.format(date) };
+}

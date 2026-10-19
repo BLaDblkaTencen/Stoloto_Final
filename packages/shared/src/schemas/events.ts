@@ -50,6 +50,7 @@ const eventFields = z.object({
   title: z
     .string({ error: 'Укажите название' })
     .trim()
+    .min(1, 'Укажите название')
     .min(EVENT_LIMITS.title.min, `Название — не короче ${EVENT_LIMITS.title.min} символов`)
     .max(EVENT_LIMITS.title.max, `Название — не длиннее ${EVENT_LIMITS.title.max} символов`),
   description: z
@@ -67,6 +68,7 @@ const eventFields = z.object({
   address: z
     .string()
     .trim()
+    .min(1, 'Укажите адрес или место')
     .min(EVENT_LIMITS.address.min, `Адрес — не короче ${EVENT_LIMITS.address.min} символов`)
     .max(EVENT_LIMITS.address.max, `Адрес — не длиннее ${EVENT_LIMITS.address.max} символов`)
     .optional(),
