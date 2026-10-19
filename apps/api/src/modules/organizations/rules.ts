@@ -40,7 +40,8 @@ export function checkPublishing(org: OrganizationRow | null): {
     );
   }
   if (org.status === 'rejected') {
-    const reason = org.rejectionReason?.trim();
+    // Точку в конце причины убираем: дальше в тексте своя, иначе выходит «снова.. Исправьте».
+    const reason = org.rejectionReason?.trim().replace(/[.!?…]+$/, '');
     throw new AppError(
       403,
       'ORG_NOT_APPROVED',

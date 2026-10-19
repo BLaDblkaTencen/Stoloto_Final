@@ -15,14 +15,11 @@ import { escapeLike, sportColumns } from '../sports/service';
 /** Моя запись: отдельный псевдоним, чтобы не путать с подзапросами по registrations. */
 const myRegistration = alias(registrations, 'my_registration');
 
+// Только для запросов с join: в запросе к одной таблице Drizzle пишет колонки без имён таблиц,
+// и условие превращается в "event_id" = "id" внутри registrations (всегда 0).
 export const confirmedCount = sql<number>`(
   select count(*)::int from ${registrations}
   where ${registrations.eventId} = ${events.id} and ${registrations.status} = 'confirmed'
-)`;
-
-export const pendingCount = sql<number>`(
-  select count(*)::int from ${registrations}
-  where ${registrations.eventId} = ${events.id} and ${registrations.status} = 'pending'
 )`;
 
 export const listFields = {

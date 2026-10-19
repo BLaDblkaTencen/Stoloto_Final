@@ -74,6 +74,13 @@ describe('checkPublishing (2.6)', () => {
     const err = appError(() => checkPublishing(makeOrg({ status: 'rejected' })));
     expect(err.message).not.toMatch(/null|undefined/);
   });
+
+  it('точка в конце причины не удваивается', () => {
+    const org = makeOrg({ status: 'rejected', rejectionReason: 'Дополните профиль.' });
+    expect(appError(() => checkPublishing(org)).message).toBe(
+      'Заявка отклонена: Дополните профиль. Исправьте данные и подайте заявку заново',
+    );
+  });
 });
 
 describe('повторная подача', () => {

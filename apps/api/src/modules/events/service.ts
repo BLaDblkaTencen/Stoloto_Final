@@ -19,7 +19,7 @@ import { AppError, errors } from '../../lib/errors';
 import type { SessionUser } from '../auth/session';
 import { resolveSport } from '../sports/service';
 import { findVenue, publishingOrganizationId, resolveVenueForEvent } from './external';
-import { confirmedCount, feedConditions, pendingCount, selectEvents, toListItem } from './queries';
+import { confirmedCount, feedConditions, selectEvents, toListItem } from './queries';
 import {
   canSeeChat,
   canSeeEvent,
@@ -156,16 +156,22 @@ export async function listMyEvents(
       .offset(query.offset),
     db.select({ total: count() }).from(events).where(where),
   ]);
+  // Счётчик заявок — группировкой по registrations. Подзапрос в запросе к одной таблице events
+  // Drizzle собирает без имён таблиц ("event_id" = "id"), и он считал бы всегда 0.
   const counts = rows.length
     ? await db
-        .select({ id: events.id, pending: pendingCount })
-        .from(events)
+        .select({ id: registrations.eventId, pending: count() })
+        .from(registrations)
         .where(
-          inArray(
-            events.id,
-            rows.map((row) => row.id),
+          and(
+            inArray(
+              registrations.eventId,
+              rows.map((row) => row.id),
+            ),
+            eq(registrations.status, 'pending'),
           ),
         )
+        .groupBy(registrations.eventId)
     : [];
   const pendingById = new Map(counts.map((c) => [c.id, c.pending]));
   return {
