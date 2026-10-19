@@ -95,6 +95,11 @@ describe('фильтры ленты', () => {
     expect(query.sportId).toHaveLength(2);
   });
 
+  it('«Где»: обрезается по краям, длинный запрос — ошибка', () => {
+    expect(eventListQuerySchema.parse({ place: '  Весны ' }).place).toBe('Весны');
+    expect(eventListQuerySchema.safeParse({ place: 'а'.repeat(101) }).success).toBe(false);
+  });
+
   it('область карты: четыре числа, min не больше max', () => {
     expect(eventListQuerySchema.parse({ bbox: '92.7,55.9,93.1,56.1' }).bbox).toEqual({
       minLng: 92.7,
