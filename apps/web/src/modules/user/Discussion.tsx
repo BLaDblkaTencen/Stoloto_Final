@@ -109,9 +109,13 @@ function Message({ comment }: { comment: Comment }) {
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{author.name}</span>
           {author.badgeLabel && (
-            <Badge tone={author.badge === 'moderator' ? 'neutral' : 'free'} icon={null}>
-              {author.badgeLabel}
-            </Badge>
+            // Длинное название организации переносится: плашка в ответе с отступом иначе
+            // растягивала страницу события шире экрана телефона (360px).
+            <span className="max-w-full [&>span]:whitespace-normal">
+              <Badge tone={author.badge === 'moderator' ? 'neutral' : 'free'} icon={null}>
+                {author.badgeLabel}
+              </Badge>
+            </span>
           )}
           <time dateTime={comment.createdAt} className="text-sm text-ink-muted">
             {formatMoment(comment.createdAt)}
