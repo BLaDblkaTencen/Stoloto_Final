@@ -9,7 +9,6 @@ import { userRoutes } from '../modules/user/routes';
 import { ErrorPage } from './ErrorPage';
 import { Layout } from './Layout';
 import { NotFoundPage } from './NotFoundPage';
-import { StartPage } from './StartPage';
 
 // Витрина компонентов только в режиме разработки: в сборке условие ложно, и Vite выкидывает
 // страницу вместе с импортом.
@@ -31,8 +30,7 @@ export const router = createBrowserRouter([
     element: <Layout />,
     errorElement: <ErrorPage />,
     children: [
-      // Временная главная: участник 1 заменяет её лентой (задача 1.4) в userRoutes и убирает отсюда.
-      { index: true, element: <StartPage /> },
+      // Главная — лента мероприятий (задача 1.4), она в userRoutes.
       ...userRoutes,
       ...orgRoutes,
       ...adminRoutes,
