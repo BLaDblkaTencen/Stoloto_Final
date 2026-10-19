@@ -70,16 +70,38 @@ Tailwind v4 уже настроен в [apps/web/src/index.css](../../apps/web/s
 | `EmptyState`, `ErrorState`, `SkeletonList`, `Skeleton` | пусто, ошибка загрузки с кнопкой «Повторить», скелетоны вместо спиннеров |
 | `Card`, `Avatar`, `Icon` | карточка (`tone` — цвет фона), аватар с инициалами, иконки из макета |
 | `sportColor`, `sportIcon` | цвет и иконка вида спорта для своих элементов, например меток на карте |
+| `eventPin`, `venuePin`, `pinIcon`, `venueTypeIcon` | метки карты для `L.divIcon` и иконки типов площадок (кафе — чашка, парк — дерево…) |
+| `MapPopupCard`, `VenueCard`, `MapUnavailable` | попап события, карточка площадки с «С кем договориться» и кнопкой «Позвонить», «Карта недоступна» |
 
 Окно, список и переключатели построены на системных элементах (`<dialog>`, `<select>`, radio): клавиатура, фокус и экранный диктор работают без отдельной библиотеки, поэтому shadcn/ui не понадобился.
 
 ## Карта (Leaflet)
 
-- Подложка OpenStreetMap как есть, атрибуция «© OpenStreetMap» обязательна.
-- **Метки событий:** `L.divIcon` с круглой кнопкой 46px (выбранная 60px), фон — цвет вида спорта, обводка 2px, тень `--shadow-sm`, внутри иконка вида спорта. Режим «По заявке» — чёрный кружок с замком в правом верхнем углу. Классы `.pin`, `.pin.is-selected` и `.pin__lock` в `home.html` можно перенести как есть.
+Стиль карты уже собран в `shared/ui` ([map.ts](../../apps/web/src/shared/ui/map.ts), [map.css](../../apps/web/src/shared/ui/map.css), [MapParts.tsx](../../apps/web/src/shared/ui/MapParts.tsx)) и проверен в настоящем Leaflet 1.9: размеры меток, замок, попап 300px, кнопки масштаба 48px, атрибуция и текст не мельче 16px. Логику карты (данные, фильтры, выбор места) пишет участник 2.
+
+```tsx
+import L from 'leaflet';
+import { MapContainer, Marker, Popup, TileLayer } from 'react-leaflet';
+import { eventPin, JoinModeBadge, MapPopupCard, sportColor } from '../../shared/ui';
+
+<MapContainer className="map-frame h-[780px]" center={[56.01, 92.853]} zoom={13}>
+  <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="© OpenStreetMap" />
+  <Marker position={[e.lat, e.lng]} title={e.title} icon={L.divIcon(eventPin({ sportSlug: e.sport.slug, joinMode: e.joinMode, selected }))}>
+    <Popup minWidth={300}>
+      <MapPopupCard color={sportColor(e.sport.slug)} sport={e.sport.name} badge={<JoinModeBadge mode={e.joinMode} />} title={e.title} actions={…}>…</MapPopupCard>
+    </Popup>
+  </Marker>
+</MapContainer>
+```
+
+- **Класс `map-frame` на контейнере обязателен:** без него остаются стили Leaflet по умолчанию (текст 12px, синие ссылки поверх наших кнопок).
+- **`title` у маркера обязателен:** это подпись метки для экранного диктора, Leaflet делает метку доступной с клавиатуры.
+- **Метки событий** (`eventPin`): 46px, выбранная 60px, цвет и иконка вида спорта, замок у «По заявке».
+- **Метки площадок** (`venuePin`): иконка типа площадки; подходящие виду спорта — жёлтые 46px, остальные — приглушённые 36px.
 - **Попап события:** карточка 300px с цветной шапкой (вид спорта и режим записи), датой, местом, уровнем, местами, организатором и двумя кнопками: «Подробнее» и «Записаться» / «Подать заявку».
+- **Карточка площадки** (`VenueCard`, в попапе — `compact`): тип, адрес, часы, блок «С кем договориться» с кнопкой «Позвонить» (ссылка `tel:`); у открытых мест без контакта — «договариваться не нужно».
 - **Список и карта на десктопе** стоят рядом: список высотой с карту (≈780px), прокрутка внутри. **На телефоне** переключатель «Список / Карта» над списком.
-- **Запасное состояние** «Карта недоступна» обязательно: в `home.html` открыть с `?nomap`.
+- **Запасное состояние** «Карта недоступна» обязательно: компонент `MapUnavailable`, в `home.html` — открыть с `?nomap`.
 
 ## Что ещё нарисовать в этом стиле
 

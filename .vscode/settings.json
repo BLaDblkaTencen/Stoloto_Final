@@ -8,15 +8,11 @@
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
 
-  "[java]": {
-    "editor.defaultFormatter": "redhat.java",
-    "editor.tabSize": 4
-  },
-  "java.configuration.updateBuildConfiguration": "automatic",
-  "java.compile.nullAnalysis.mode": "automatic",
-
   "[javascript][typescript][javascriptreact][typescriptreact][json][jsonc][html][css][scss][markdown]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "prettier.requireConfig": true
+  "prettier.requireConfig": true,
+
+  // Tailwind v4: тема (токены дизайна) задана в этом файле, по нему работают подсказки классов.
+  "tailwindCSS.experimental.configFile": "apps/web/src/index.css"
 }

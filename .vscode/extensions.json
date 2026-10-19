@@ -1,10 +1,8 @@
 {
   "recommendations": [
-    "vscjava.vscode-java-pack",
-    "vmware.vscode-boot-dev-pack",
     "esbenp.prettier-vscode",
-    "dbaeumer.vscode-eslint",
     "editorconfig.editorconfig",
+    "bradlc.vscode-tailwindcss",
     "humao.rest-client",
     "ms-vsliveshare.vsliveshare",
     "eamodio.gitlens",
