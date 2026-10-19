@@ -3,7 +3,8 @@
 import { EVENT_TIMEZONE, type EventMapItem } from '@sport/shared/schemas/events';
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { Bbox, Venue } from '@sport/shared/schemas/venues';
-import { useEffect, type ReactNode } from 'react';
+import type L from 'leaflet';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { Link } from 'react-router';
 import {
@@ -26,9 +27,16 @@ export type EventsMapViewProps = {
   /** Ссылка «Создать встречу здесь» в попапе площадки; null — кнопки нет (гость, админ). */
   createHref?: ((venue: Venue) => string) | null;
   selectedId?: string;
+  /** Нажали на метку встречи: список рядом выделяет ту же встречу. */
+  onSelect?: (id: string) => void;
+  /** Показать встречу: карта переходит к ней и открывает попап (кнопка «На карте» в списке). */
+  focus?: MapFocus;
   onBoundsChange: (bbox: Bbox) => void;
   className?: string;
 };
+
+/** key меняется при каждом нажатии «На карте», чтобы повторное нажатие снова открыло попап. */
+export type MapFocus = { id: string; lat: number; lng: number; key: number };
 
 // Время встречи по Красноярску, как в ленте и карточке, а не в поясе браузера.
 const dateFormat = new Intl.DateTimeFormat('ru', {
@@ -46,9 +54,12 @@ export function EventsMapView({
   venues = [],
   createHref = null,
   selectedId,
+  onSelect,
+  focus,
   onBoundsChange,
   className,
 }: EventsMapViewProps) {
+  const markers = useRef(new Map<string, L.Marker>());
   // С включёнными площадками встреча на площадке стоит ровно на её метке и закрыла бы её:
   // такие встречи показываем списком в попапе площадки, отдельной меткой — только свои точки.
   const atVenue = new Map<string, EventMapItem[]>(venues.map((venue) => [venue.id, []]));
@@ -62,6 +73,7 @@ export function EventsMapView({
   return (
     <BaseMap label="Карта встреч" className={className}>
       <BoundsWatcher onChange={onBoundsChange} />
+      <FocusWatcher focus={focus} markers={markers.current} events={events} />
       {venues.map((venue) => {
         const suitable = venue.suitable ?? true;
         const here = atVenue.get(venue.id) ?? [];
@@ -114,6 +126,11 @@ export function EventsMapView({
         return (
           <Marker
             key={event.id}
+            ref={(marker) => {
+              if (marker) markers.current.set(event.id, marker);
+              else markers.current.delete(event.id);
+            }}
+            eventHandlers={onSelect ? { click: () => onSelect(event.id) } : undefined}
             position={[event.lat, event.lng]}
             title={event.title}
             zIndexOffset={selected ? 1000 : 0}
@@ -179,6 +196,56 @@ function PopupLink({
       {children}
     </Link>
   );
+}
+
+const FLY_SECONDS = 0.6;
+
+/**
+ * Переход к встрече по «На карте»: карта летит к точке, а попап открывается, когда метка есть
+ * на карте. Если встреча была за краем, метка появится после загрузки новой области.
+ */
+function FocusWatcher({
+  focus,
+  markers,
+  events,
+}: {
+  focus?: MapFocus;
+  markers: Map<string, L.Marker>;
+  events: EventMapItem[];
+}) {
+  const map = useMap();
+  const pending = useRef<string | null>(null);
+  const flying = useRef(false);
+
+  const open = () => {
+    const marker = pending.current ? markers.get(pending.current) : undefined;
+    if (!marker) return;
+    pending.current = null;
+    marker.openPopup();
+  };
+
+  useEffect(() => {
+    if (!focus) return;
+    pending.current = focus.id;
+    flying.current = true;
+    map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 15), { duration: FLY_SECONDS });
+    // Попап — после перелёта: иначе автосдвиг под попап спорит с анимацией.
+    const timer = setTimeout(
+      () => {
+        flying.current = false;
+        open();
+      },
+      FLY_SECONDS * 1000 + 100,
+    );
+    return () => clearTimeout(timer);
+    // Только на новое нажатие «На карте»; key меняется при каждом.
+  }, [focus?.key]);
+
+  // Метка встречи из-за края карты появляется после загрузки новой области.
+  useEffect(() => {
+    if (!flying.current) open();
+  }, [events]);
+  return null;
 }
 
 /** Сообщает видимую область при открытии карты и после каждого сдвига или масштабирования. */

@@ -38,6 +38,7 @@ export function useVenue(id: string | null) {
 /** Те же фильтры, что у ленты (GET /api/events): карта и список показывают одну подборку. */
 export type EventsMapFilters = {
   q?: string;
+  place?: string;
   sportId?: string;
   joinMode?: JoinMode;
   level?: EventLevel;
