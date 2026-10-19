@@ -12,6 +12,7 @@ import type {
   UpdateEventData,
 } from '@sport/shared/schemas/events';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, lte, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { db, type Tx } from '../../db/client';
 import { events, registrations, sports, users } from '../../db/schema';
 import { AppError, errors } from '../../lib/errors';
@@ -30,7 +31,14 @@ import {
 } from './rules';
 
 export const eventNotFound = () => new AppError(404, 'EVENT_NOT_FOUND', 'Событие не найдено');
-const eventHidden = () => new AppError(404, 'EVENT_UNAVAILABLE', 'Событие недоступно');
+export const eventHidden = () => new AppError(404, 'EVENT_UNAVAILABLE', 'Событие недоступно');
+
+/** id события из пути; не UUID — такого события нет (404, а не 422 и не ошибка базы). */
+export function eventIdFrom(params: unknown): string {
+  const result = z.object({ id: z.uuid() }).safeParse(params);
+  if (!result.success) throw eventNotFound();
+  return result.data.id;
+}
 
 export async function listEvents(
   query: EventListQuery,
