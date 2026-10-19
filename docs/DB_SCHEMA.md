@@ -104,9 +104,9 @@ erDiagram
 - Перечисления экспортируются массивами (`EVENT_STATUSES` и т.д.): `packages/shared` строит из них Zod-схемы, а не копирует строки.
 - Подключение в каркасе (3.1): `drizzle.config.ts` со `schema: './src/db/schema/index.ts'`, `pnpm db:push`.
 
-## Отличия от DATA_MODEL.md
+## Что изменилось в DATA_MODEL.md вместе со схемой
 
-По правилам контракта их нужно внести в `DATA_MODEL.md` отдельным маленьким PR:
+Схема и `DATA_MODEL.md` совпадают. Вместе со схемой в контракт внесено:
 
 1. Новая служебная таблица `app_meta` (ключ — значение) для `seed_version`.
 2. `audit_log.action` и `target_type` — перечисления, а не строки; значения те же.

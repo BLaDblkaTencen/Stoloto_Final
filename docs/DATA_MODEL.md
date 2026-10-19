@@ -1,7 +1,7 @@
 # Модель данных (единая для всех)
 
 Это источник правды по сущностям. Менять можно только отдельным маленьким PR с пометкой в чате: на этом файле строятся API, база и интерфейс всех трёх участников.
-Типы условные: конкретные типы СУБД выбираются после выбора стека. Имена полей — `snake_case` на английском. Идентификаторы — строки (UUID или число, отдаём в API как строку). Время хранится в UTC (ISO 8601), отображается в локальном часовом поясе.
+Типы здесь условные. Конкретные типы PostgreSQL и ограничения базы — в [DB_SCHEMA.md](DB_SCHEMA.md) и коде `apps/api/src/db/schema`; при расхождении правится то, что отстало, отдельным PR. Имена полей — `snake_case` на английском. Идентификаторы — UUID, в API отдаются строкой. Время хранится в UTC (ISO 8601), отображается в локальном часовом поясе.
 
 ## Связи
 
@@ -12,8 +12,20 @@ User 1──* Event (создатель)        Event *──0..1 Organization (
 Event 1──* Comment *──1 User       Comment *──0..1 Comment (ответ)
 User/Admin 1──* AuditLog
 User 1──* Session
+User 1──* UserSport *──1 Sport
 Event *──0..1 Venue            Sport 1──* SportVenueType (подходящие типы площадок)
+AppMeta — служебная таблица без связей
 ```
+
+## Кто меняет данные
+
+Таблицы распределены по владельцам в [OWNERSHIP.md](OWNERSHIP.md) и [DB_SCHEMA.md](DB_SCHEMA.md). Два исключения, чтобы никому не приходилось править чужой модуль:
+
+- **Поля решений администратора** меняет только модуль `admin` (участник 3), владельцы таблиц их только читают:
+  `Organization.status` (кроме повторной подачи заявки), `rejection_reason`, `reviewed_by`, `reviewed_at`;
+  `Event.status`, `moderation_reason`, `moderated_by`, `moderated_at`;
+  `Comment.is_hidden`, `hidden_by`, `hidden_reason`.
+- **Решение по заявке участника** панель организатора (участник 2) принимает через сервис модуля `registrations` (участник 1), а не своим SQL: правила переходов статусов живут в одном месте.
 
 ## Роли аккаунтов
 
@@ -21,7 +33,7 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 Аккаунт с ролью `organization` — это представитель. У него ровно одна `Organization`. Один аккаунт — одна роль. Демо-аккаунты всех трёх ролей лежат в сиде ([DEMO_DATA.md](DEMO_DATA.md)).
 
 **Регистрация и вход — настоящие (email + пароль).** При регистрации выбирается тип аккаунта: «Участник» (`user`) или «Представляю организацию» (`organization`). **Роль `admin` регистрацией получить нельзя**, админ создаётся только сидом. Не делаем: подтверждение почты, SMS, восстановление пароля, вход через внешние сервисы (ТЗ их не требует).
-**Организатор мероприятия — не роль.** Это `Event.created_by` плюс, если указана, `Event.organization_id`. Событие от имени организации создаёт аккаунт `organization` с одобренной `Organization`.
+**Организатор мероприятия — не роль.** Это `Event.created_by` плюс, если указана, `Event.organization_id`. Событие от имени организации создаёт аккаунт `organization` с одобренной `Organization`. Такой аккаунт создаёт события только от имени своей организации: `organization_id` ставит сервер, выбора организатора в форме нет.
 
 ---
 
@@ -40,7 +52,7 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 | avatar_url | string? | необязательно, иначе инициалы |
 | created_at | datetime | |
 
-Интересы пользователя: `UserSport(user_id, sport_id)`, необязательно.
+Интересы пользователя: `UserSport(user_id, sport_id)`, необязательно. Владелец — участник 1 (профиль).
 
 ## Sport — вид спорта (каталог в БД)
 
@@ -59,7 +71,7 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 3. Если `slug` уже есть — использовать существующий спорт, дубль не создавать.
 4. Иначе создать `Sport` с `is_custom = true`. Он сразу доступен в фильтрах и списках.
 
-**Подходящие площадки:** `SportVenueType(sport_id, venue_type)` — какие типы площадок подходят виду спорта (нужны для подсказки на карте). Например: шахматы → `cafe`, `club`; футбол → `field`, `hall`; бег → `park`. У своего вида спорта типов нет, карта показывает все площадки.
+**Подходящие площадки:** `SportVenueType(sport_id, venue_type)` — какие типы площадок подходят виду спорта (нужны для подсказки на карте). Например: шахматы → `cafe`, `club`; футбол → `field`, `hall`; бег → `park`. У своего вида спорта типов нет, карта показывает все площадки. Владелец связки — участник 2 (карта).
 
 Стартовый список (сид): футбол, баскетбол, волейбол, бег, шахматы, йога, зарядка во дворе, настольный теннис, плавание, велоспорт.
 
@@ -77,8 +89,8 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 | status | enum | `pending` / `approved` / `rejected` |
 | rejection_reason | text? | обязательно при `rejected` |
 | reviewed_by | id → User? | админ |
-| reviewed_at | datetime? | |
-| created_at | datetime | |
+| reviewed_at | datetime? | обязательны вместе с `reviewed_by` при `approved` / `rejected` |
+| created_at, updated_at | datetime | |
 
 Интересы: `OrganizationSport(organization_id, sport_id)`, минимум один.
 
@@ -96,7 +108,7 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 | description | text | |
 | sport_id | id → Sport | |
 | created_by | id → User | автор; именно он управляет записями (админ — нет) |
-| organization_id | id → Organization? | если событие от имени организации; организация должна быть `approved` |
+| organization_id | id → Organization? | если событие от имени организации; организация должна быть `approved`, а `created_by` — её представителем |
 | starts_at | datetime | в будущем при создании |
 | ends_at | datetime? | |
 | address | string | адрес или понятное описание места; если выбрана площадка, подставляется её адрес |
@@ -149,10 +161,10 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 | event_id | id → Event | |
 | user_id | id → User | |
 | status | enum | `confirmed` / `pending` / `rejected` / `cancelled` |
-| message | text? | сообщение организатору при заявке |
-| created_at | datetime | |
+| message | text? | сообщение организатору при заявке, до 500 символов |
+| created_at, updated_at | datetime | |
 | decided_at | datetime? | |
-| decided_by | id → User? | всегда автор события |
+| decided_by | id → User? | всегда автор события; обязателен при `rejected` |
 
 Уникальна пара `(event_id, user_id)`: одна запись, которая меняет статус.
 
@@ -179,16 +191,18 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 | id | id | |
 | event_id | id → Event | |
 | author_id | id → User | |
-| parent_id | id → Comment? | ответ в ветке; глубина 1 |
+| parent_id | id → Comment? | ответ в ветке; глубина 1; родитель — в том же мероприятии |
 | text | text | 1–1000 символов |
 | is_hidden | bool | скрыто модератором |
 | hidden_by | id → User? | |
 | hidden_reason | string? | |
 | created_at | datetime | |
 
+- Ответ организатора — обычный комментарий с `parent_id`; отдельной сущности для ответов нет.
 - Писать может любой авторизованный пользователь (в том числе не записанный). Читать обсуждение открытых событий можно без записи.
 - Роль автора в ленте комментариев вычисляется: автор события — плашка «Организатор» (или название организации), админ — «Модератор».
 - Скрытый комментарий показывается как «Сообщение скрыто модератором», текст не отдаётся в API.
+- «Удалить сообщение» в админке (задача 3.6) — это скрытие: комментарии, как и события, физически не удаляются.
 - На `unpublished` / `deleted` писать нельзя, читать может организатор, записавшиеся и админ.
 
 ## Session — сессия входа
@@ -204,17 +218,27 @@ Event *──0..1 Venue            Sport 1──* SportVenueType (подходя
 
 ## AuditLog — журнал действий (минимальный)
 
-| Поле | Тип |
-| --- | --- |
-| id | id |
-| actor_id | id → User |
-| action | string (`org.approve`, `org.reject`, `event.unpublish`, `event.delete`, `comment.hide`) |
-| target_type | string |
-| target_id | id |
-| reason | text? |
-| created_at | datetime |
+| Поле | Тип | Правила |
+| --- | --- | --- |
+| id | id | |
+| actor_id | id → User | |
+| action | enum | `org.approve` / `org.reject` / `event.unpublish` / `event.delete` / `comment.hide` |
+| target_type | enum | `organization` / `event` / `comment`; соответствует действию (`org.*` → `organization` и т.д.) |
+| target_id | id | без внешнего ключа: цель бывает трёх типов |
+| reason | text? | обязательна для `org.reject`, `event.unpublish`, `event.delete` |
+| created_at | datetime | |
 
 Пишется при каждом решении админа. В интерфейсе показывать необязательно.
+
+## AppMeta — служебные данные
+
+| Поле | Тип | Правила |
+| --- | --- | --- |
+| key | string | первичный ключ; сейчас используется один: `seed_version` |
+| value | string | |
+| updated_at | datetime | |
+
+Сид при старте сервера наполняет базу, только если `seed_version` в коде новее записанной. Бесплатный Render засыпает и при пробуждении перезапускает сервер: без этой проверки сид стирал бы данные, созданные экспертами. Чтобы пересоздать демо-данные, нужно поднять версию в коде сида или выполнить `pnpm db:seed` вручную.
 
 ---
 
