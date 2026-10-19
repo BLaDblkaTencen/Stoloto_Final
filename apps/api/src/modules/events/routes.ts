@@ -8,25 +8,17 @@ import {
   updateEventSchema,
 } from '@sport/shared/schemas/events';
 import type { FastifyPluginAsync } from 'fastify';
-import { z } from 'zod';
 import { parse } from '../../lib/errors';
 import { currentUser, requireRole } from '../auth/guards';
 import {
   createEvent,
-  eventNotFound,
+  eventIdFrom,
   getEventDetails,
   listEvents,
   listMapEvents,
   listMyEvents,
   updateEvent,
 } from './service';
-
-/** id из пути; не UUID — такого события нет (404, а не 422 и не ошибка базы). */
-export function eventIdFrom(params: unknown): string {
-  const result = z.object({ id: z.uuid() }).safeParse(params);
-  if (!result.success) throw eventNotFound();
-  return result.data.id;
-}
 
 const organizers = requireRole('user', 'organization');
 
