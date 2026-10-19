@@ -5,7 +5,7 @@ import { NavLink } from 'react-router';
 import { useMe } from '../modules/auth/api';
 
 const ITEMS: { to: string; label: string; roles?: UserRole[] }[] = [
-  { to: '/map', label: 'Карта встреч' },
+  { to: '/', label: 'Встречи' },
   { to: '/organizations', label: 'Организации' },
   { to: '/me/events', label: 'Мои мероприятия', roles: ['user', 'organization'] },
   { to: '/org', label: 'Кабинет организации', roles: ['organization'] },
@@ -25,6 +25,7 @@ export function MainNav() {
         <NavLink
           key={item.to}
           to={item.to}
+          end={item.to === '/'}
           className={({ isActive }) =>
             `inline-flex min-h-[var(--control-height)] items-center no-underline ${isActive ? 'shadow-[inset_0_-3px_0_var(--color-accent)]' : ''}`
           }

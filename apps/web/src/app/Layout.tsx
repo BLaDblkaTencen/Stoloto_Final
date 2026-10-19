@@ -2,9 +2,14 @@
 // Пункты меню — в MainNav.tsx.
 import { Link, Outlet } from 'react-router';
 import { AccountMenu } from '../modules/auth/AccountMenu';
+import { useMe } from '../modules/auth/api';
+import { ButtonLink, Icon } from '../shared/ui';
 import { MainNav } from './MainNav';
 
 export function Layout() {
+  const me = useMe();
+  // Создать встречу может участник и организация; гостя форма сначала попросит войти.
+  const canCreate = !me.isPending && me.data?.role !== 'admin';
   return (
     <div className="flex min-h-screen flex-col">
       <header className="page-container flex flex-wrap items-center justify-between gap-4 py-5">
@@ -18,7 +23,15 @@ export function Layout() {
           <span className="font-display text-[26px] font-bold">вместе</span>
         </Link>
         <MainNav />
-        <AccountMenu />
+        <div className="flex flex-wrap items-center gap-3">
+          <AccountMenu />
+          {canCreate && (
+            <ButtonLink to="/events/new" variant="dark">
+              <Icon name="plus" />
+              Создать встречу
+            </ButtonLink>
+          )}
+        </div>
       </header>
 
       <main className="page-container flex-1 py-6">
@@ -26,8 +39,16 @@ export function Layout() {
       </main>
 
       <footer className="border-t-2 border-ink bg-surface">
-        <div className="page-container py-6 text-sm">
-          Прототип для финала ЧР по продуктовому программированию, кейс Столото
+        <div className="page-container flex flex-wrap justify-between gap-4 py-6 text-sm">
+          <span>
+            <span className="font-display font-bold">вместе © 2026</span> · прототип для финала ЧР
+            по продуктовому программированию, кейс Столото
+          </span>
+          <nav aria-label="Дополнительно" className="flex flex-wrap gap-5">
+            <Link to="/map">Карта и площадки</Link>
+            <Link to="/organizations">Организации</Link>
+            <Link to="/org">Для организаций</Link>
+          </nav>
         </div>
       </footer>
     </div>

@@ -26,6 +26,8 @@ import { meQueryKey } from '../auth/api';
 /** Параметры ленты, как в адресе страницы и в запросе к API. */
 export type FeedParams = {
   q?: string;
+  /** «Где»: часть адреса или названия площадки. */
+  place?: string;
   sportId?: string;
   dateFrom?: string;
   dateTo?: string;
