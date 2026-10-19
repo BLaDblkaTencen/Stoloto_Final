@@ -1,7 +1,7 @@
 // Запросы карты «Место встречи». Владелец: участник 2. Контракт — docs/api/organizations.md, раздел 3.
 import type { EventLevel, JoinMode } from '@sport/shared';
 import type { EventMapItem } from '@sport/shared/schemas/events';
-import { formatBbox, type Bbox, type Venue } from '@sport/shared/schemas/venues';
+import { formatBbox, type Bbox, type Venue, type VenueCard } from '@sport/shared/schemas/venues';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../../shared/api/client';
 
@@ -15,11 +15,22 @@ const search = (params: Record<string, string | undefined>) => {
  * Все площадки сразу (их десятки): одна загрузка на вид спорта, дальше карта двигается без запросов.
  * С sportId у каждой есть suitable — подходит ли она этому виду спорта.
  */
-export function useVenues(sportId: string | undefined) {
+export function useVenues(sportId: string | undefined, enabled = true) {
   return useQuery({
     queryKey: ['venues', sportId ?? null],
     queryFn: () => api<{ items: Venue[] }>(`/venues?${search({ sportId, limit: '500' })}`),
     select: (data) => data.items,
+    staleTime: 60_000,
+    enabled,
+  });
+}
+
+/** Одна площадка: «Создать встречу здесь» с карты открывает форму с ней. */
+export function useVenue(id: string | null) {
+  return useQuery({
+    queryKey: ['venues', 'one', id],
+    queryFn: () => api<VenueCard>(`/venues/${id}`),
+    enabled: id !== null,
     staleTime: 60_000,
   });
 }
@@ -36,17 +47,21 @@ export type EventsMapFilters = {
 };
 
 /**
- * События в видимой области карты. Область округляется наружу до сотых градуса: мелкие сдвиги
- * карты попадают в тот же запрос из кэша, а метки у края не пропадают.
+ * Область карты, округлённая наружу до сотых градуса: мелкие сдвиги карты попадают в тот же
+ * запрос из кэша и не перерисовывают её, а метки у края не пропадают.
  */
-export function useEventsOnMap(bbox: Bbox | null, filters: EventsMapFilters) {
-  const rounded = bbox && {
+export function roundBbox(bbox: Bbox): Bbox {
+  return {
     minLng: Math.floor(bbox.minLng * 100) / 100,
     minLat: Math.floor(bbox.minLat * 100) / 100,
     maxLng: Math.ceil(bbox.maxLng * 100) / 100,
     maxLat: Math.ceil(bbox.maxLat * 100) / 100,
   };
-  const bboxParam = rounded ? formatBbox(rounded) : undefined;
+}
+
+/** События в видимой области карты; область уже округлена roundBbox (повторное округление сдвигало бы её). */
+export function useEventsOnMap(bbox: Bbox | null, filters: EventsMapFilters) {
+  const bboxParam = bbox ? formatBbox(bbox) : undefined;
   return useQuery({
     queryKey: ['events', 'map', bboxParam, filters],
     queryFn: () =>
