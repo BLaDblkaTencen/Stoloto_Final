@@ -9,7 +9,7 @@ import {
 import type { EventListItem } from '@sport/shared/schemas/events';
 import type { Sport } from '@sport/shared/schemas/sports';
 import { useState, type FormEvent, type ReactNode } from 'react';
-import { Link, useNavigate, useParams } from 'react-router';
+import { Link, Navigate, useNavigate, useParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
   Alert,
@@ -119,7 +119,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
             </p>
           </div>
           {isMe && (
-            <ButtonLink to="/me/profile" variant="secondary" className="mt-16">
+            <ButtonLink to="/me/profile/edit" variant="secondary" className="mt-16">
               Изменить профиль
             </ButtonLink>
           )}
@@ -131,8 +131,8 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
       ) : (
         isMe && (
           <p className="text-ink-muted">
-            Расскажите о себе в <Link to="/me/profile">профиле</Link>: опыт и любимые занятия увидит
-            организатор в вашей заявке.
+            Расскажите о себе в <Link to="/me/profile/edit">профиле</Link>: опыт и любимые занятия
+            увидит организатор в вашей заявке.
           </p>
         )
       )}
@@ -285,6 +285,20 @@ function ProfileEventCard({ event, status }: { event: EventListItem; status?: Re
       </div>
     </article>
   );
+}
+
+/** /me/profile — свой профиль: туда же, куда ведёт «Профиль» в меню. */
+export function MyProfileRedirect() {
+  return (
+    <RequireAuth>
+      <MyProfileTarget />
+    </RequireAuth>
+  );
+}
+
+function MyProfileTarget() {
+  const me = useMe();
+  return me.data ? <Navigate to={`/users/${me.data.id}`} replace /> : null;
 }
 
 export function EditProfileRoute() {
