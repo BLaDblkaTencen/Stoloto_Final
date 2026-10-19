@@ -1,17 +1,19 @@
 // Клиент API: все запросы к серверу идут через api(). Сессия живёт в HttpOnly-cookie,
 // браузер отправляет её сам. Ошибки сервера превращаются в ApiError с текстом для пользователя.
-import type { ApiErrorBody, ErrorCode } from '@sport/shared';
+import type { ApiErrorBody } from '@sport/shared';
 
 export class ApiError extends Error {
   readonly status: number;
-  readonly code: ErrorCode;
-  readonly details: ApiErrorBody['error']['details'];
+  /** Общий код (UNAUTHORIZED, VALIDATION_ERROR…) или код модуля (ORG_NOT_APPROVED…). */
+  readonly code: string;
+  /** Для 422: текст ошибки под каждым полем формы. */
+  readonly fields: Record<string, string>;
 
   constructor(status: number, body: ApiErrorBody['error']) {
     super(body.message);
     this.status = status;
     this.code = body.code;
-    this.details = body.details;
+    this.fields = body.fields ?? {};
   }
 }
 

@@ -6,6 +6,7 @@
     "dev": "tsx watch --clear-screen=false src/server.ts",
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/db/seed/run.ts"
   },
@@ -24,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "24.19.1",
-    "drizzle-kit": "0.31.11"
+    "drizzle-kit": "0.31.11",
+    "vitest": "5.0.3"
   }
 }
