@@ -1,6 +1,7 @@
-// Создание и правка мероприятия (задача 1.3, сценарий 1 ТЗ). Одна форма на оба случая.
+// Создание и правка мероприятия (задачи 1.3, 1.10, сценарии 1 и 2 ТЗ). Одна форма на оба случая.
 // Проверка — той же схемой, что на сервере (createEventSchema), поэтому ошибки под полями
-// появляются до отправки и теми же словами. Время вводится по Красноярску.
+// появляются до отправки и теми же словами. Время вводится по Красноярску. Место выбирается
+// на карте «Место встречи» (участник 2): площадка с контактом администратора или своя точка.
 import {
   EVENT_LEVEL_LABELS,
   EVENT_LEVELS,
@@ -16,7 +17,7 @@ import {
   type EventInput,
 } from '@sport/shared/schemas/events';
 import { normalizeSportName, sportSlug } from '@sport/shared/schemas/sports';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
@@ -28,12 +29,15 @@ import {
   ErrorState,
   RadioCards,
   SelectField,
+  Skeleton,
   SkeletonList,
   TextareaField,
   TextField,
 } from '../../shared/ui';
 import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
+import { useMyOrganization } from '../org/api';
+import { MapPicker, type PlaceValue } from '../org/map';
 import { useCreateEvent, useEvent, useSports, useUpdateEvent } from './api';
 import { isoDay, localParts, LOCAL_TIME_NOTE, toUtcIso } from './format';
 
@@ -48,6 +52,7 @@ type FormState = {
   date: string;
   startTime: string;
   endTime: string;
+  place: PlaceValue;
   address: string;
   placeNotes: string;
   joinMode: JoinMode | '';
@@ -65,6 +70,7 @@ const EMPTY: FormState = {
   date: '',
   startTime: '',
   endTime: '',
+  place: null,
   address: '',
   placeNotes: '',
   joinMode: '',
@@ -84,6 +90,11 @@ function fromEvent(event: EventDetails): FormState {
     date: start.date,
     startTime: start.time,
     endTime: event.endsAt ? localParts(event.endsAt).time : '',
+    place: event.venue
+      ? { kind: 'venue', venue: event.venue }
+      : event.lat !== null && event.lng !== null
+        ? { kind: 'point', lat: event.lat, lng: event.lng }
+        : null,
     address: event.address,
     placeNotes: event.placeNotes ?? '',
     joinMode: event.joinMode,
@@ -97,6 +108,7 @@ function fromEvent(event: EventDetails): FormState {
 /** Поля формы → тело запроса. Пустые необязательные поля уходят как null. */
 function toInput(form: FormState): EventInput {
   const custom = form.sportId === CUSTOM_SPORT;
+  const point = form.place?.kind === 'point' ? form.place : null;
   return {
     title: form.title,
     description: form.description,
@@ -105,6 +117,9 @@ function toInput(form: FormState): EventInput {
     startsAt: toUtcIso(form.date, form.startTime),
     endsAt: form.endTime ? toUtcIso(form.date, form.endTime) : null,
     address: form.address,
+    venueId: form.place?.kind === 'venue' ? form.place.venue.id : null,
+    lat: point?.lat ?? null,
+    lng: point?.lng ?? null,
     placeNotes: form.placeNotes,
     joinMode: form.joinMode as JoinMode,
     level: form.level,
@@ -168,6 +183,13 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
   const [errors, setErrors] = useState<Record<string, string>>({});
   const saving = create.isPending || update.isPending;
   const requestError = create.error ?? update.error;
+  const formRef = useRef<HTMLFormElement>(null);
+  const [attempt, setAttempt] = useState(0);
+
+  // После неудачной отправки — к первому полю с ошибкой: на длинной форме его может быть не видно.
+  useEffect(() => {
+    if (attempt) formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus();
+  }, [attempt]);
 
   // Поле формы → под каким полем показана его ошибка (время — под датой, свой вид — под видом спорта).
   const errorKey: Partial<Record<keyof FormState, string>> = {
@@ -187,6 +209,21 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
       });
     };
 
+  /** Площадка подставляет свой адрес, пока человек не вписал другой. */
+  const choosePlace = (place: PlaceValue) => {
+    setForm((prev) => {
+      const previous = prev.place?.kind === 'venue' ? prev.place.venue.address : '';
+      const ownAddress = prev.address.trim() !== '' && prev.address !== previous;
+      const address = ownAddress
+        ? prev.address
+        : place?.kind === 'venue'
+          ? place.venue.address
+          : '';
+      return { ...prev, place, address };
+    });
+    setErrors(({ venueId: _venue, lat: _lat, address: _address, ...rest }) => rest);
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     const input = toInput(form);
@@ -197,14 +234,14 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
     if (!form.sportId) clientErrors.sportId = 'Выберите вид спорта из списка или впишите свой';
     setErrors(clientErrors);
     if (Object.keys(clientErrors).length) {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      setAttempt((n) => n + 1);
       return;
     }
     const options = {
       onSuccess: (saved: EventDetails) => navigate(`/events/${saved.id}`),
       onError: (error: Error) => {
         if (error instanceof ApiError) setErrors(toFormErrors(error.fields));
-        window.scrollTo({ top: 0, behavior: 'smooth' });
+        setAttempt((n) => n + 1);
       },
     };
     if (event) update.mutate(input, options);
@@ -216,18 +253,20 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
   const existing = customSlug ? sports.data?.find((sport) => sport.slug === customSlug) : undefined;
 
   return (
-    <form onSubmit={submit} noValidate className="mx-auto flex max-w-3xl flex-col gap-6">
+    <form
+      ref={formRef}
+      onSubmit={submit}
+      noValidate
+      className="mx-auto flex max-w-3xl flex-col gap-6"
+    >
       <div className="flex flex-col gap-2">
         <Link to={event ? `/events/${event.id}` : '/'} className="self-start font-semibold">
           ← {event ? 'К событию' : 'Все встречи'}
         </Link>
         <h1 className="text-h2">{event ? 'Изменить встречу' : 'Новая встреча'}</h1>
-        {me.data?.role === 'organization' && !event && (
-          <p className="text-ink-muted">
-            Встреча будет опубликована от имени вашей организации, сразу и без повторной проверки.
-          </p>
-        )}
       </div>
+
+      {me.data?.role === 'organization' && !event && <PublishAs />}
 
       {requestError && (
         <Alert>
@@ -319,14 +358,24 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
 
       <Card className="flex flex-col gap-5">
         <h2 className="text-h3">Где</h2>
+        <MapPicker
+          sportId={form.sportId && form.sportId !== CUSTOM_SPORT ? form.sportId : undefined}
+          value={form.place}
+          onChange={choosePlace}
+          error={errors.venueId ?? errors.lat}
+        />
         <TextField
           label="Адрес или место"
-          hint="Так, чтобы человек нашёл без карты: улица и дом или понятное описание"
+          hint={
+            form.place?.kind === 'venue'
+              ? 'Подставлен адрес площадки, можно уточнить'
+              : 'Так, чтобы человек нашёл без карты: улица и дом или понятное описание'
+          }
           placeholder="Остров Татышев, главный вход"
           maxLength={EVENT_LIMITS.address.max}
           value={form.address}
           onChange={(e) => set('address')(e.target.value)}
-          error={errors.address ?? errors.venueId}
+          error={errors.address}
         />
         <TextField
           label="Как найти"
@@ -408,5 +457,34 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
         </ButtonLink>
       </div>
     </form>
+  );
+}
+
+/** Аккаунт организации публикует от её имени и только после допуска (сценарий 2 ТЗ). */
+function PublishAs() {
+  const org = useMyOrganization();
+  if (org.isPending) return <Skeleton className="h-16 w-full" />;
+  if (!org.data) {
+    return (
+      <Alert tone="warning">
+        Публиковать события можно после допуска организации. <Link to="/org">Подать заявку</Link>
+      </Alert>
+    );
+  }
+  if (org.data.status !== 'approved') {
+    return (
+      <Alert tone="warning">
+        {org.data.status === 'pending'
+          ? 'Заявка организации на рассмотрении: опубликовать событие можно после допуска.'
+          : 'Заявка организации отклонена: исправьте данные и подайте её заново.'}{' '}
+        <Link to="/org">Кабинет организации</Link>
+      </Alert>
+    );
+  }
+  return (
+    <Card tone="accent" className="p-4 font-semibold">
+      Встреча будет опубликована от имени организации «{org.data.name}», сразу и без повторной
+      проверки.
+    </Card>
   );
 }

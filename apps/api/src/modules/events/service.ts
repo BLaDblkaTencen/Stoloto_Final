@@ -13,13 +13,13 @@ import type {
 } from '@sport/shared/schemas/events';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { db, type Tx } from '../../db/client';
+import { db } from '../../db/client';
 import { events, registrations, sports, users } from '../../db/schema';
 import { AppError, errors } from '../../lib/errors';
 import type { SessionUser } from '../auth/session';
 import { resolveSport } from '../sports/service';
-import { findVenue, publishingOrganizationId } from './external';
-import { confirmedCount, feedConditions, pendingCount, selectEvents, toListItem } from './queries';
+import { findVenue, publishingOrganizationId, resolveVenueForEvent } from './external';
+import { confirmedCount, feedConditions, selectEvents, toListItem } from './queries';
 import {
   canSeeChat,
   canSeeEvent,
@@ -117,7 +117,7 @@ export async function getEventDetails(id: string, viewer: Viewer): Promise<Event
           .where(and(eq(registrations.eventId, id), eq(registrations.status, 'confirmed')))
           .orderBy(asc(registrations.createdAt))
       : null,
-    row.venueId ? findVenue(db, row.venueId) : null,
+    row.venueId ? findVenue(row.venueId) : null,
   ]);
   const denial = joinDenial(row, viewer, myStatus, row.participantsCount, now);
 
@@ -156,16 +156,22 @@ export async function listMyEvents(
       .offset(query.offset),
     db.select({ total: count() }).from(events).where(where),
   ]);
+  // Счётчик заявок — группировкой по registrations. Подзапрос в запросе к одной таблице events
+  // Drizzle собирает без имён таблиц ("event_id" = "id"), и он считал бы всегда 0.
   const counts = rows.length
     ? await db
-        .select({ id: events.id, pending: pendingCount })
-        .from(events)
+        .select({ id: registrations.eventId, pending: count() })
+        .from(registrations)
         .where(
-          inArray(
-            events.id,
-            rows.map((row) => row.id),
+          and(
+            inArray(
+              registrations.eventId,
+              rows.map((row) => row.id),
+            ),
+            eq(registrations.status, 'pending'),
           ),
         )
+        .groupBy(registrations.eventId)
     : [];
   const pendingById = new Map(counts.map((c) => [c.id, c.pending]));
   return {
@@ -181,18 +187,12 @@ export async function listMyEvents(
 
 /** Место события: площадка из справочника (её координаты и, если не введён, адрес) или своя точка. */
 async function resolvePlace(
-  tx: Tx,
   input:
     | { venueId: string; address?: string }
     | { venueId: null; address: string; lat: number | null; lng: number | null },
 ) {
   if (input.venueId === null) return input;
-  const venue = await findVenue(tx, input.venueId);
-  if (!venue) {
-    throw new AppError(422, 'VENUE_NOT_FOUND', 'Площадка не найдена', {
-      venueId: 'Площадка не найдена, выберите другую',
-    });
-  }
+  const venue = await resolveVenueForEvent(input.venueId);
   return {
     venueId: venue.id,
     address: input.address ?? venue.address,
@@ -215,7 +215,6 @@ export async function createEvent(input: CreateEventData, user: SessionUser): Pr
     const organizationId =
       user.role === 'organization' ? await publishingOrganizationId(tx, user) : null;
     const place = await resolvePlace(
-      tx,
       input.venueId
         ? { venueId: input.venueId, address: input.address }
         : {
@@ -307,7 +306,7 @@ export async function updateEvent(id: string, input: UpdateEventData, user: Sess
     // Место: новая площадка задаёт координаты; без площадки — своя точка или прежняя.
     const venueId = input.venueId !== undefined ? input.venueId : current.venueId;
     const place = venueId
-      ? await resolvePlace(tx, {
+      ? await resolvePlace({
           venueId,
           address: input.address ?? (venueId === current.venueId ? current.address : undefined),
         })
