@@ -19,6 +19,7 @@ import {
 import { useEvent } from './api';
 import { MetaLine, OrganizerLink, SportTile } from './EventBits';
 import { formatSeats, formatWhen, LOCAL_TIME_NOTE } from './format';
+import { Discussion } from './Discussion';
 import { JoinPanel } from './JoinPanel';
 
 export function EventPage() {
@@ -65,6 +66,7 @@ function EventView({ event }: { event: EventDetails }) {
         </Alert>
       )}
 
+      {/* На телефоне: описание → запись → обсуждение; на широком экране запись справа на всю высоту. */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
         <Card className="flex flex-col gap-6">
           <header className="flex flex-col gap-3">
@@ -109,9 +111,13 @@ function EventView({ event }: { event: EventDetails }) {
           </section>
         </Card>
 
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <JoinPanel event={event} />
           <Participants event={event} />
+        </div>
+
+        <div className="lg:col-start-1">
+          <Discussion event={event} />
         </div>
       </div>
     </div>

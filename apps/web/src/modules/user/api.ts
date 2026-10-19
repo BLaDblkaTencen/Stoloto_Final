@@ -8,6 +8,7 @@ import type {
   ListResponse,
   MyRegistration,
 } from '@sport/shared/schemas/events';
+import type { Comment, CommentInput } from '@sport/shared/schemas/comments';
 import type { MyRegistrationItem } from '@sport/shared/schemas/registrations';
 import type { Sport } from '@sport/shared/schemas/sports';
 import {
@@ -139,6 +140,26 @@ export function useUpdateEvent(eventId: string) {
       queryClient.setQueryData(['events', 'detail', event.id], event);
       void queryClient.invalidateQueries({ queryKey: ['events'] });
       void queryClient.invalidateQueries({ queryKey: ['sports'] });
+    },
+  });
+}
+
+export function useComments(eventId: string) {
+  return useQuery({
+    queryKey: ['events', 'comments', eventId],
+    queryFn: () => api<{ items: Comment[] }>(`/events/${eventId}/comments`),
+    select: (data) => data.items,
+  });
+}
+
+export function useAddComment(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CommentInput) =>
+      api<Comment>(`/events/${eventId}/comments`, { method: 'POST', json: body }),
+    // Без ожидания: форма очищается сразу, а список обновится следом.
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['events', 'comments', eventId] });
     },
   });
 }
