@@ -1,6 +1,7 @@
 // Раскладка всех страниц: шапка, содержимое, подвал. Владелец: участник 3.
-// Пункты меню и кнопка аккаунта появятся вместе с экранами зон и входом (задача 3.2).
+// Пункты меню появятся вместе с экранами зон.
 import { Link, Outlet } from 'react-router';
+import { AccountMenu } from '../modules/auth/AccountMenu';
 
 export function Layout() {
   return (
@@ -15,6 +16,7 @@ export function Layout() {
           </span>
           <span className="font-display text-[26px] font-bold">вместе</span>
         </Link>
+        <AccountMenu />
       </header>
 
       <main className="page-container flex-1 py-6">
