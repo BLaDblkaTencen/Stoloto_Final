@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
   Button,
+  ButtonLink,
   Card,
   Chip,
   EmptyState,
@@ -92,6 +93,7 @@ export function FeedPage() {
             initial={params.q ?? ''}
             onSearch={(q) => setParam('q', q)}
           />
+          <CreateEventLink />
         </div>
         <MyRegistrations />
       </section>
@@ -128,6 +130,21 @@ export function FeedPage() {
         onReset={() => setSearch({}, { replace: true })}
       />
     </div>
+  );
+}
+
+/** «Создать встречу»: участнику и организации; без входа форма сначала попросит войти. */
+function CreateEventLink() {
+  const me = useMe();
+  if (me.data?.role === 'admin') return null;
+  return (
+    <p className="flex flex-wrap items-center gap-3">
+      <span className="text-ink-muted">Не нашли подходящую встречу?</span>
+      <ButtonLink to="/events/new" variant="dark">
+        <Icon name="plus" />
+        Создать встречу
+      </ButtonLink>
+    </p>
   );
 }
 
@@ -279,10 +296,12 @@ function Feed({
               : 'Скоро здесь появятся встречи соседей, клубов и сообществ.'
           }
           action={
-            hasFilters && (
+            hasFilters ? (
               <Button variant="secondary" onClick={onReset}>
                 Сбросить фильтры
               </Button>
+            ) : (
+              <ButtonLink to="/events/new">Создать встречу</ButtonLink>
             )
           }
         />

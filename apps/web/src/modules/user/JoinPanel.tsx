@@ -47,6 +47,11 @@ export function JoinPanel({ event }: { event: EventDetails }) {
             ? 'Люди подают заявки, вы принимаете или отклоняете их.'
             : 'Люди записываются сразу, без вашего подтверждения.'}
         </p>
+        {permissions.canEdit && (
+          <ButtonLink to={`/events/${event.id}/edit`} variant="secondary" className="self-start">
+            Изменить встречу
+          </ButtonLink>
+        )}
       </Card>
     );
   }

@@ -3,6 +3,7 @@
 // чтобы лента, карточка и «Мои записи» сразу показывали новый статус.
 import type {
   EventDetails,
+  EventInput,
   EventListItem,
   ListResponse,
   MyRegistration,
@@ -48,7 +49,7 @@ export function useSports(options: { withEvents?: boolean } = {}) {
         `/sports${toQuery({ withEvents: options.withEvents ? 'true' : undefined })}`,
       ),
     select: (data) => data.items,
-    staleTime: 5 * 60_000,
+    staleTime: 60_000,
   });
 }
 
@@ -114,4 +115,30 @@ export function useCancelRegistration(eventId: string) {
   return useRegistrationMutation(() =>
     api<NonNullable<MyRegistration>>(`/events/${eventId}/registration`, { method: 'DELETE' }),
   );
+}
+
+/** Создать событие; после успеха лента и «Мои мероприятия» перечитываются. */
+export function useCreateEvent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: EventInput) => api<EventDetails>('/events', { method: 'POST', json: body }),
+    onSuccess: (event) => {
+      queryClient.setQueryData(['events', 'detail', event.id], event);
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+      void queryClient.invalidateQueries({ queryKey: ['sports'] });
+    },
+  });
+}
+
+export function useUpdateEvent(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Partial<EventInput>) =>
+      api<EventDetails>(`/events/${eventId}`, { method: 'PATCH', json: body }),
+    onSuccess: (event) => {
+      queryClient.setQueryData(['events', 'detail', event.id], event);
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+      void queryClient.invalidateQueries({ queryKey: ['sports'] });
+    },
+  });
 }
