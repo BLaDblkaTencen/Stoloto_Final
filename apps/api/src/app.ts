@@ -6,10 +6,14 @@ import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
+import { z } from 'zod';
 import { isProduction } from './env';
 import { errors, registerErrorHandling } from './lib/errors';
 import { registerModules } from './modules';
 import { registerAuth } from './modules/auth/guards';
+
+// Стандартные ошибки Zod по-русски: там, где в схеме не задан свой текст (например, limit=abc).
+z.config(z.locales.ru());
 
 const webDist = fileURLToPath(new URL('../../web/dist', import.meta.url));
 
