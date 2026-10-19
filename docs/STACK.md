@@ -17,6 +17,7 @@
 | Бэкенд | Fastify + Zod | MIT |
 | **База данных** | **PostgreSQL** | PostgreSQL License |
 | ORM и схема | Drizzle ORM + drizzle-kit | Apache-2.0 |
+| Авторизация | email + пароль, Argon2id (`@node-rs/argon2`, запасной `bcryptjs`), сессии в Postgres, `@fastify/cookie`, `@fastify/rate-limit`, `@fastify/helmet` | MIT / Apache-2.0 |
 | Тесты | Vitest, Playwright (сценарии ТЗ в браузере) | MIT / Apache-2.0 |
 | Форматирование | Prettier (конфиг в репо), ESLint | MIT |
 | Локальная БД | Docker Compose (образ `postgres`) или установленный Postgres | см. ниже |
@@ -62,6 +63,7 @@ docker-compose.yml   локальный Postgres
 ```
 DATABASE_URL=postgres://sport:sport@localhost:5432/sport
 SESSION_SECRET=сменить-в-проде
+SESSION_TTL_DAYS=7
 PORT=3000
 ```
 
