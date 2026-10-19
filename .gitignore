@@ -1,0 +1,41 @@
+# Java / Maven / Gradle
+target/
+build/
+out/
+.gradle/
+*.class
+*.log
+!gradle/wrapper/gradle-wrapper.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# Node / фронтенд
+node_modules/
+dist/
+.next/
+.vite/
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# Секреты и локальные настройки
+.env
+.env.*
+!.env.example
+application-local.*
+
+# IDE (общие настройки VS Code лежат в репо, остальное — нет)
+.idea/
+*.iml
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.project
+.classpath
+.settings/
+.factorypath
+
+# ОС
+.DS_Store
+Thumbs.db
+desktop.ini

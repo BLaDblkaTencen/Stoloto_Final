@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "vscjava.vscode-java-pack",
+    "vmware.vscode-boot-dev-pack",
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint",
+    "editorconfig.editorconfig",
+    "humao.rest-client",
+    "ms-vsliveshare.vsliveshare",
+    "eamodio.gitlens",
+    "usernamehw.errorlens"
+  ]
+}
