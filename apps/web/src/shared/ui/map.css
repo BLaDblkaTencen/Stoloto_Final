@@ -1,0 +1,145 @@
+/*
+ * Карта в стиле «Вместе» поверх Leaflet (docs/design/README.md, раздел «Карта»).
+ * Контейнер карты получает класс map-frame: правила ниже работают только внутри него и поэтому
+ * сильнее стандартных стилей leaflet.css, в каком бы порядке те ни загрузились.
+ * Значения — только из tokens.css.
+ */
+
+.map-frame {
+  position: relative;
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  background: var(--map-land);
+}
+
+/* Leaflet по умолчанию пишет 12px — в интерфейсе меньше 16px нельзя. */
+.map-frame.leaflet-container,
+.map-frame .leaflet-container {
+  font: inherit;
+  font-size: var(--text-base);
+  background: var(--map-land);
+}
+
+/*
+ * leaflet.css красит все ссылки в синий. Он не в слое, а Tailwind — в слоях, поэтому без этой
+ * строки синий перебил бы цвет кнопок-ссылок в попапе («Позвонить», «Подробнее»).
+ * revert-layer отменяет правило Leaflet, и снова действуют наши классы.
+ */
+.map-frame.leaflet-container a,
+.map-frame .leaflet-container a {
+  color: revert-layer;
+}
+
+/* Метки (pinIcon в map.ts). Позицию задаёт Leaflet, здесь только вид. */
+.pin {
+  position: relative;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  border: var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+.pin.is-selected {
+  box-shadow: var(--shadow-md);
+  outline: 3px solid var(--color-ink);
+  outline-offset: 2px;
+}
+.pin.is-muted {
+  border-color: var(--color-line-soft);
+  box-shadow: none;
+  color: var(--color-ink-muted);
+}
+.pin__lock {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+.leaflet-marker-icon:focus-visible .pin,
+.leaflet-marker-icon:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+/* Выбранная метка поверх соседних. */
+.leaflet-marker-icon:has(.pin.is-selected) {
+  z-index: 1000 !important;
+}
+
+/* Попап: карточка с обводкой и жёсткой тенью; содержимое — MapPopupCard. */
+.map-frame .leaflet-popup-content-wrapper {
+  padding: 0;
+  overflow: hidden;
+  border: var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 5px 5px 0 var(--color-line);
+}
+.map-frame .leaflet-popup-content {
+  width: min(300px, 80vw) !important;
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+.map-frame .leaflet-popup-tip {
+  border: var(--border);
+  box-shadow: none;
+}
+/* Закрытие — круглая кнопка 48px на углу карточки: не наезжает на цветную шапку. */
+.map-frame .leaflet-container a.leaflet-popup-close-button,
+.map-frame.leaflet-container a.leaflet-popup-close-button {
+  top: -16px;
+  right: -16px;
+  z-index: 1;
+  width: 48px;
+  height: 48px;
+  border: var(--border);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font: 700 28px/44px var(--font-body);
+}
+
+/* Кнопки масштаба — как наши кнопки: 48px, обводка, тень. */
+.map-frame .leaflet-bar {
+  border: none;
+  box-shadow: none;
+}
+.map-frame .leaflet-bar a,
+.map-frame .leaflet-bar a:first-child,
+.map-frame .leaflet-bar a:last-child {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 10px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: 24px;
+  line-height: 44px;
+}
+
+/* Атрибуция OpenStreetMap обязательна (лицензия ODbL) и тоже не мельче 16px. */
+.map-frame .leaflet-control-attribution {
+  padding: 2px 8px;
+  background: rgb(255 255 255 / 0.9);
+  font-size: var(--text-sm);
+}
+.map-frame .leaflet-control-attribution a {
+  color: var(--color-ink);
+}

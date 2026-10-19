@@ -6,6 +6,7 @@
  */
 @import 'tailwindcss';
 @import '../../../docs/design/tokens.css';
+@import './shared/ui/map.css';
 
 /*
  * inline — утилиты подставляют var(--токен) напрямую; reference — Tailwind не объявляет эти

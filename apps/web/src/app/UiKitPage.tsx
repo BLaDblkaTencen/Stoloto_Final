@@ -1,5 +1,6 @@
 // Витрина shared/ui: все компоненты и их состояния на одной странице. Только в режиме разработки
 // (pnpm dev → /ui), в сборку для экспертов не попадает. Владелец: участник 3.
+import { VENUE_TYPE_LABELS, VENUE_TYPES } from '@sport/shared';
 import { useState, type ReactNode } from 'react';
 import {
   Alert,
@@ -10,16 +11,42 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  eventPin,
   JoinModeBadge,
+  MapPopupCard,
+  MapUnavailable,
   Modal,
   RadioCards,
   SelectField,
   SkeletonList,
   SportChip,
+  sportColor,
   StatusBadge,
   TextareaField,
   TextField,
+  VenueCard,
+  venuePin,
+  venueTypeIcon,
 } from '../shared/ui';
+
+/** Метка на макете карты: как её разместил бы Leaflet (по центру точки, размер из iconSize). */
+function MockPin({ x, y, icon }: { x: number; y: number; icon: ReturnType<typeof eventPin> }) {
+  const [width, height] = icon.iconSize;
+  return (
+    <div
+      className="absolute"
+      style={{
+        left: `${x}%`,
+        top: `${y}%`,
+        width,
+        height,
+        marginLeft: -icon.iconAnchor[0],
+        marginTop: -icon.iconAnchor[1],
+      }}
+      dangerouslySetInnerHTML={{ __html: icon.html }}
+    />
+  );
+}
 
 const SPORTS = [
   'Футбол',
@@ -179,6 +206,68 @@ export function UiKitPage() {
           />
           <ErrorState error={new Error()} onRetry={() => undefined} />
           <SkeletonList count={2} />
+        </div>
+      </Section>
+
+      <Section title="Карта и площадки">
+        <div className="flex flex-wrap gap-2">
+          {VENUE_TYPES.map((type) => (
+            <Badge key={type} icon={venueTypeIcon(type)}>
+              {VENUE_TYPE_LABELS[type]}
+            </Badge>
+          ))}
+        </div>
+        <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
+          <div className="map-frame relative h-[320px]" aria-label="Макет меток">
+            <MockPin x={14} y={30} icon={eventPin({ sportSlug: 'футбол', joinMode: 'free' })} />
+            <MockPin x={32} y={62} icon={eventPin({ sportSlug: 'шахматы', joinMode: 'request' })} />
+            <MockPin
+              x={50}
+              y={34}
+              icon={eventPin({ sportSlug: 'бег', joinMode: 'free', selected: true })}
+            />
+            <MockPin x={68} y={70} icon={venuePin({ type: 'cafe', suitable: true })} />
+            <MockPin x={80} y={30} icon={venuePin({ type: 'field', suitable: false })} />
+            <MockPin x={88} y={62} icon={venuePin({ type: 'pool', suitable: false })} />
+          </div>
+          <div className="self-start overflow-hidden rounded-lg border-2 border-ink shadow-[5px_5px_0_var(--color-line)]">
+            <MapPopupCard
+              color={sportColor('шахматы')}
+              sport="Шахматы"
+              badge={<JoinModeBadge mode="request" />}
+              title="Блиц-турнир клуба «Е2–Е4»"
+              actions={
+                <>
+                  <Button variant="secondary">Подробнее</Button>
+                  <Button variant="dark">Подать заявку</Button>
+                </>
+              }
+            >
+              <span>25 октября, 18:00</span>
+              <span>Шахматный клуб «Эндшпиль»</span>
+              <span>Любители · 0 из 16</span>
+            </MapPopupCard>
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-3">
+          <VenueCard
+            venue={{
+              name: 'Кафе «Ход конём»',
+              type: 'cafe',
+              address: 'пр. Мира, 12',
+              workingHours: 'ежедневно 10:00–22:00',
+              description: 'Тихий зал, есть доски и часы',
+              contactName: 'Ирина Соколова, администратор',
+              contactPhone: '+7 900 000-01-01',
+              contactNote: 'Звоните ежедневно с 10 до 20, столы на вечер бронируем за день',
+            }}
+          />
+          <VenueCard
+            venue={{ name: 'Центральный парк', type: 'park', address: 'Центральный парк' }}
+          />
+          <div className="map-frame">
+            <MapUnavailable onRetry={() => undefined} />
+          </div>
         </div>
       </Section>
 

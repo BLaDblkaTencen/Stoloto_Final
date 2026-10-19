@@ -7,7 +7,19 @@ import type {
   OrgStatus,
   RegistrationStatus,
   UserRole,
+  VenueType,
 } from './enums';
+
+export const VENUE_TYPE_LABELS: Record<VenueType, string> = {
+  cafe: 'Кафе',
+  club: 'Клуб',
+  field: 'Поле',
+  hall: 'Зал',
+  pool: 'Бассейн',
+  park: 'Парк',
+  yard: 'Двор',
+  other: 'Другое',
+};
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   user: 'Участник',
