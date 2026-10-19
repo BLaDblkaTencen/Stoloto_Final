@@ -3,7 +3,7 @@
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useRef, useState, type ReactNode } from 'react';
-import { MapContainer, TileLayer } from 'react-leaflet';
+import { AttributionControl, MapContainer, TileLayer } from 'react-leaflet';
 import { MapUnavailable } from '../../../shared/ui';
 
 /** Центр Красноярска (у Центрального парка) — город демо-данных. */
@@ -54,8 +54,10 @@ export function BaseMap({
       aria-label={label}
       // Колесо прокрутки двигает страницу, а не карту: иначе страницу с картой трудно пролистать.
       scrollWheelZoom={false}
-      attributionControl
+      attributionControl={false}
     >
+      {/* Без префикса «Leaflet»: его лицензия ссылки не требует. «© OpenStreetMap» обязателен (ODbL). */}
+      <AttributionControl prefix={false} />
       <TileLayer
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
