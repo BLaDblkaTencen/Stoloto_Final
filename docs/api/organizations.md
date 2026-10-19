@@ -160,7 +160,7 @@ type Venue = {
 
 | Метод и путь | Запрос | Успех |
 | --- | --- | --- |
-| `GET /api/venues` | `type?` (через запятую), `sportId?`, `onlySuitable?` (`true`/`false`, по умолчанию `false`), `bbox?` (`minLng,minLat,maxLng,maxLat`), `q?` (название и адрес), `limit?` (по умолчанию 200, максимум 500) | `200` `{ items: Venue[] }`. Без пагинации: карта запрашивает видимую область. При `sportId` у площадок есть `suitable`, подходящие идут первыми, дальше по названию |
+| `GET /api/venues` | `type?` (через запятую), `sportId?`, `onlySuitable?` (`true`/`false`, по умолчанию `false`), `bbox?` (`minLng,minLat,maxLng,maxLat`), `q?` (название и адрес), `limit?` (по умолчанию 200, максимум 500) | `200` `{ items: Venue[] }`. Без пагинации: карта запрашивает видимую область. При `sportId` у площадок есть `suitable`, подходящие идут первыми, дальше по названию. Если у вида спорта нет подсказки (свой вариант), `suitable: true` у всех площадок, а `onlySuitable` ничего не отсекает |
 | `GET /api/venues/:id` | — | `200` `Venue`; 404 `VENUE_NOT_FOUND` |
 | `GET /api/venue-types` | — | `200` `{ types: { value: VenueType, label: string }[], bySport: Record<sportId, VenueType[]> }`. Один запрос для карты и формы; `Cache-Control: public, max-age=300`. У своего вида спорта в `bySport` ключа нет: подсвечивать нечего, показываются все площадки |
 
