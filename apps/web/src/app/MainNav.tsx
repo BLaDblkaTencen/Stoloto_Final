@@ -5,6 +5,11 @@ import { NavLink } from 'react-router';
 import { useMe } from '../modules/auth/api';
 
 const ITEMS: { to: string; label: string; roles?: UserRole[] }[] = [
+  { to: '/map', label: 'Карта встреч' },
+  { to: '/organizations', label: 'Организации' },
+  { to: '/me/events', label: 'Мои мероприятия', roles: ['user', 'organization'] },
+  { to: '/org', label: 'Кабинет организации', roles: ['organization'] },
+  { to: '/me/profile', label: 'Профиль', roles: ['user'] },
   { to: '/admin', label: 'Админка', roles: ['admin'] },
 ];
 

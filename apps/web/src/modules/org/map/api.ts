@@ -1,5 +1,5 @@
 // Запросы карты «Место встречи». Владелец: участник 2. Контракт — docs/api/organizations.md, раздел 3.
-import type { JoinMode } from '@sport/shared';
+import type { EventLevel, JoinMode } from '@sport/shared';
 import type { EventMapItem } from '@sport/shared/schemas/events';
 import { formatBbox, type Bbox, type Venue } from '@sport/shared/schemas/venues';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
@@ -24,7 +24,16 @@ export function useVenues(sportId: string | undefined) {
   });
 }
 
-export type EventsMapFilters = { sportId?: string; joinMode?: JoinMode; date?: string };
+/** Те же фильтры, что у ленты (GET /api/events): карта и список показывают одну подборку. */
+export type EventsMapFilters = {
+  q?: string;
+  sportId?: string;
+  joinMode?: JoinMode;
+  level?: EventLevel;
+  date?: string;
+  dateFrom?: string;
+  dateTo?: string;
+};
 
 /**
  * События в видимой области карты. Область округляется наружу до сотых градуса: мелкие сдвиги

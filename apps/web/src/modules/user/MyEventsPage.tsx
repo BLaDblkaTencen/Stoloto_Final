@@ -1,0 +1,187 @@
+// «Мои мероприятия» (задача 1.7): куда я записан, со статусами и пояснениями, и что организую,
+// со счётчиком новых заявок. Снятые события тоже здесь: человек видит «Публикация недоступна».
+// Вкладка и период — в адресе страницы, чтобы «Назад» из карточки события возвращал туда же.
+import type { EventListItem } from '@sport/shared/schemas/events';
+import type { ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router';
+import {
+  Badge,
+  ButtonLink,
+  Chip,
+  EmptyState,
+  ErrorState,
+  Icon,
+  SkeletonList,
+  StatusBadge,
+} from '../../shared/ui';
+import { RequireAuth } from '../auth/RequireAuth';
+import { useMe } from '../auth/api';
+import { useMyEvents, useMyRegistrations, type Scope } from './api';
+import { MetaLine, SportTile } from './EventBits';
+import { formatSeats, formatWhen, LOCAL_TIME_NOTE, plural } from './format';
+
+type Tab = 'join' | 'organize';
+
+/** Пояснение к статусу записи: что происходит и чего ждать. */
+const REGISTRATION_HINT = {
+  confirmed: null,
+  pending: 'Организатор ещё не ответил на заявку',
+  rejected: 'Организатор отклонил заявку',
+  cancelled: 'Вы отменили запись',
+} as const;
+
+export function MyEventsRoute() {
+  return (
+    <RequireAuth roles={['user', 'organization']}>
+      <MyEventsPage />
+    </RequireAuth>
+  );
+}
+
+function MyEventsPage() {
+  const me = useMe();
+  const isParticipant = me.data?.role === 'user';
+  const [search, setSearch] = useSearchParams();
+  // У организации записей нет: только то, что она организует.
+  const tab: Tab = isParticipant && search.get('tab') !== 'organize' ? 'join' : 'organize';
+  const scope: Scope = search.get('scope') === 'past' ? 'past' : 'upcoming';
+
+  const setParam = (key: string, value: string | null) =>
+    setSearch(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      },
+      { replace: true },
+    );
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-h2 mb-2">Мои мероприятия</h1>
+          <p className="text-ink-muted">{LOCAL_TIME_NOTE}</p>
+        </div>
+        <ButtonLink to="/events/new">
+          <Icon name="plus" />
+          Создать встречу
+        </ButtonLink>
+      </div>
+
+      <div className="flex flex-wrap gap-6">
+        {isParticipant && (
+          <div role="group" aria-label="Чьи мероприятия" className="flex flex-wrap gap-2.5">
+            <Chip pressed={tab === 'join'} icon="people" onClick={() => setParam('tab', null)}>
+              Я участвую
+            </Chip>
+            <Chip
+              pressed={tab === 'organize'}
+              icon="calendar"
+              index={1}
+              onClick={() => setParam('tab', 'organize')}
+            >
+              Я организую
+            </Chip>
+          </div>
+        )}
+        <div role="group" aria-label="Период" className="flex flex-wrap gap-2.5">
+          <Chip pressed={scope === 'upcoming'} index={2} onClick={() => setParam('scope', null)}>
+            Предстоящие
+          </Chip>
+          <Chip pressed={scope === 'past'} index={3} onClick={() => setParam('scope', 'past')}>
+            Прошедшие
+          </Chip>
+        </div>
+      </div>
+
+      {tab === 'join' ? <Joined scope={scope} /> : <Organized scope={scope} />}
+    </div>
+  );
+}
+
+function Joined({ scope }: { scope: Scope }) {
+  const list = useMyRegistrations(true, 50, scope);
+  if (list.isPending) return <SkeletonList count={3} />;
+  if (list.isError) return <ErrorState error={list.error} onRetry={() => list.refetch()} />;
+  if (list.data.items.length === 0) {
+    return (
+      <EmptyState
+        title={scope === 'past' ? 'Прошедших встреч нет' : 'Вы пока никуда не записаны'}
+        text="Найдите встречу в ленте и запишитесь — она появится здесь со статусом."
+        action={<ButtonLink to="/">Найти встречу</ButtonLink>}
+      />
+    );
+  }
+  return (
+    <ul className="grid gap-4 lg:grid-cols-2">
+      {list.data.items.map((item) => {
+        const hint = REGISTRATION_HINT[item.myRegistration.status];
+        return (
+          <EventRow key={item.id} event={item}>
+            {item.status === 'published' ? (
+              <StatusBadge kind="registration" status={item.myRegistration.status} />
+            ) : (
+              <StatusBadge kind="event" status={item.status} />
+            )}
+            <span className="text-sm text-ink-muted">
+              {item.status !== 'published'
+                ? `Публикация недоступна${item.moderationReason ? `: ${item.moderationReason}` : ''}`
+                : hint}
+            </span>
+          </EventRow>
+        );
+      })}
+    </ul>
+  );
+}
+
+function Organized({ scope }: { scope: Scope }) {
+  const list = useMyEvents(true, scope);
+  if (list.isPending) return <SkeletonList count={3} />;
+  if (list.isError) return <ErrorState error={list.error} onRetry={() => list.refetch()} />;
+  if (list.data.items.length === 0) {
+    return (
+      <EmptyState
+        title={scope === 'past' ? 'Прошедших встреч нет' : 'Вы пока ничего не организуете'}
+        text="Создайте встречу: выберите вид спорта, время и место на карте."
+        action={<ButtonLink to="/events/new">Создать встречу</ButtonLink>}
+      />
+    );
+  }
+  return (
+    <ul className="grid gap-4 lg:grid-cols-2">
+      {list.data.items.map((item) => (
+        <EventRow key={item.id} event={item}>
+          <StatusBadge kind="event" status={item.status} />
+          {item.pendingCount > 0 && (
+            <Badge tone="warning">
+              {plural(item.pendingCount, ['новая заявка', 'новые заявки', 'новых заявок'])}
+            </Badge>
+          )}
+          {item.status !== 'published' && item.moderationReason && (
+            <span className="text-sm text-ink-muted">Причина: {item.moderationReason}</span>
+          )}
+        </EventRow>
+      ))}
+    </ul>
+  );
+}
+
+function EventRow({ event, children }: { event: EventListItem; children: ReactNode }) {
+  return (
+    <li className="flex gap-4 rounded-lg border-2 border-ink bg-surface p-4 shadow-sm">
+      <SportTile sport={event.sport} size={44} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <Link to={`/events/${event.id}`} className="text-[19px] font-semibold leading-snug">
+          {event.title}
+        </Link>
+        <MetaLine icon="calendar">{formatWhen(event.startsAt, event.endsAt)}</MetaLine>
+        <MetaLine icon="pin">{event.address}</MetaLine>
+        <MetaLine icon="people">{formatSeats(event.participantsCount, event.capacity)}</MetaLine>
+        <div className="mt-1 flex flex-wrap items-center gap-2">{children}</div>
+      </div>
+    </li>
+  );
+}

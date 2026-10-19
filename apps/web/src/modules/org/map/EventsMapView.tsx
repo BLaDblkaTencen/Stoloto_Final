@@ -1,6 +1,6 @@
 // Карта встреч (задача 2.10): события в видимой области, метки по виду спорта, попап с кнопкой.
 // Ленивая часть EventsMap: всё, что требует Leaflet.
-import type { EventMapItem } from '@sport/shared/schemas/events';
+import { EVENT_TIMEZONE, type EventMapItem } from '@sport/shared/schemas/events';
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { Bbox } from '@sport/shared/schemas/venues';
 import { useEffect } from 'react';
@@ -16,7 +16,9 @@ export type EventsMapViewProps = {
   className?: string;
 };
 
+// Время встречи по Красноярску, как в ленте и карточке, а не в поясе браузера.
 const dateFormat = new Intl.DateTimeFormat('ru', {
+  timeZone: EVENT_TIMEZONE,
   weekday: 'short',
   day: 'numeric',
   month: 'long',

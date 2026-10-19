@@ -5,6 +5,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
   Button,
+  ButtonLink,
   Card,
   Chip,
   EmptyState,
@@ -16,6 +17,7 @@ import {
   StatusBadge,
 } from '../../shared/ui';
 import { useMe } from '../auth/api';
+import { EventsMap } from '../org/map';
 import { useFeed, useMyRegistrations, useSports, type FeedParams } from './api';
 import { EventCard } from './EventCard';
 import { formatWhen, isoDay, LOCAL_TIME_NOTE } from './format';
@@ -60,7 +62,8 @@ export function FeedPage() {
     joinMode: oneOf(JOIN_MODES, search.get('mode')),
     level: oneOf(EVENT_LEVELS, search.get('level')),
   };
-  const hasFilters = [...search.keys()].length > 0;
+  const view = search.get('view') === 'map' ? 'map' : 'list';
+  const hasFilters = [...search.keys()].some((key) => key !== 'view');
 
   /** Поменять один параметр адреса, остальные сохранить; пустое значение убирает параметр. */
   const setParam = (key: string, value: string | undefined) => {
@@ -122,11 +125,53 @@ export function FeedPage() {
         />
       </section>
 
-      <Feed
-        params={params}
-        hasFilters={hasFilters}
-        onReset={() => setSearch({}, { replace: true })}
-      />
+      <ViewSwitch view={view} onChange={(next) => setParam('view', next === 'map' ? next : '')} />
+
+      {view === 'map' ? (
+        // «Место встречи» (1.10): та же подборка, что в списке, метками на карте.
+        <section aria-label="Встречи на карте" className="flex flex-col gap-3">
+          <p className="text-ink-muted">
+            Метка — встреча, цвет — вид спорта, замок — запись по заявке. {LOCAL_TIME_NOTE}.
+          </p>
+          <EventsMap filters={params} className="h-[60vh] min-h-[420px]" />
+        </section>
+      ) : (
+        <Feed
+          params={params}
+          hasFilters={hasFilters}
+          onReset={() => setSearch({}, { replace: true })}
+        />
+      )}
+    </div>
+  );
+}
+
+/** «Список / Карта» и кнопка создания встречи для тех, кто может её создать. */
+function ViewSwitch({
+  view,
+  onChange,
+}: {
+  view: 'list' | 'map';
+  onChange: (view: 'list' | 'map') => void;
+}) {
+  const me = useMe();
+  const canCreate = me.data?.role === 'user' || me.data?.role === 'organization';
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div role="group" aria-label="Как показать встречи" className="flex flex-wrap gap-2.5">
+        <Chip pressed={view === 'list'} icon="all" onClick={() => onChange('list')}>
+          Список
+        </Chip>
+        <Chip pressed={view === 'map'} icon="map" index={1} onClick={() => onChange('map')}>
+          Карта
+        </Chip>
+      </div>
+      {canCreate && (
+        <ButtonLink to="/events/new">
+          <Icon name="plus" />
+          Создать встречу
+        </ButtonLink>
+      )}
     </div>
   );
 }

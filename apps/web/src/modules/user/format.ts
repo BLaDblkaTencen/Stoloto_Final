@@ -21,6 +21,38 @@ const isoDayFormat = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 });
 
+// Части даты в поясе мероприятий — для перевода полей формы «дата» и «время» в UTC и обратно.
+const partsFormat = new Intl.DateTimeFormat('en-GB', {
+  timeZone: EVENT_TIMEZONE,
+  hourCycle: 'h23',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** На сколько минут пояс мероприятий опережает UTC в момент date. */
+function zoneOffsetMinutes(date: Date) {
+  const parts = Object.fromEntries(partsFormat.formatToParts(date).map((p) => [p.type, p.value]));
+  const local = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
+  return (local - Math.floor(date.getTime() / 60_000) * 60_000) / 60_000;
+}
+
+/** Поля формы «2026-10-26» и «08:00» по местному времени мероприятий → ISO в UTC. */
+export function zonedToIso(day: string, time: string) {
+  const [y, m, d] = day.split('-').map(Number);
+  const [h, min] = time.split(':').map(Number);
+  const asUtc = Date.UTC(y, m - 1, d, h, min);
+  return new Date(asUtc - zoneOffsetMinutes(new Date(asUtc)) * 60_000).toISOString();
+}
+
+/** ISO из API → значения полей формы «дата» и «время» по местному времени мероприятий. */
+export function isoToZoned(iso: string) {
+  const date = new Date(iso);
+  return { day: isoDayFormat.format(date), time: timeFormat.format(date) };
+}
+
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** «Сб, 26 октября · 08:00–09:30». */

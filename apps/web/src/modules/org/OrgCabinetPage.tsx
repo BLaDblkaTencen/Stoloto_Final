@@ -116,6 +116,10 @@ function Cabinet({ org }: { org: OrganizationOwner }) {
             Организация допущена. Ваши события публикуются сразу, без повторной проверки.
           </p>
           <div className="flex flex-wrap gap-3">
+            <ButtonLink to="/events/new">Опубликовать событие</ButtonLink>
+            <ButtonLink to="/me/events" variant="secondary">
+              Наши события и заявки
+            </ButtonLink>
             <ButtonLink to={`/organizations/${org.id}`} variant="secondary">
               Публичная страница
             </ButtonLink>
