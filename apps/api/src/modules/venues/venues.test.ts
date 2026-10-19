@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DomainError } from '../../lib/domain-error';
+import { AppError } from '../../lib/errors';
 import { inBbox, parseBbox } from './geo';
 import {
   DEFAULT_LIMIT,
@@ -76,8 +76,8 @@ describe('parseBbox', () => {
     try {
       parseBbox(raw);
     } catch (e) {
-      expect(e).toBeInstanceOf(DomainError);
-      expect([(e as DomainError).status, (e as DomainError).code]).toEqual([422, 'INVALID_BBOX']);
+      expect(e).toBeInstanceOf(AppError);
+      expect([(e as AppError).status, (e as AppError).code]).toEqual([422, 'INVALID_BBOX']);
       return;
     }
     throw new Error('Ожидалась ошибка INVALID_BBOX');

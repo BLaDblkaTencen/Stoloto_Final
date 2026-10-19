@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DomainError } from '../../lib/domain-error';
+import { AppError } from '../../lib/errors';
 import {
   assertCanCreateOrganization,
   buildResubmitChanges,
@@ -36,24 +36,24 @@ const readerOf = (org: OrganizationRecord | null): OrganizationReader => ({
 
 const orgUser: ActingUser = { id: 'user-org', role: 'organization' };
 
-async function errorOf(promise: Promise<unknown>): Promise<DomainError> {
+async function errorOf(promise: Promise<unknown>): Promise<AppError> {
   try {
     await promise;
   } catch (e) {
-    expect(e).toBeInstanceOf(DomainError);
-    return e as DomainError;
+    expect(e).toBeInstanceOf(AppError);
+    return e as AppError;
   }
-  throw new Error('Ожидалась ошибка DomainError, но её не было');
+  throw new Error('Ожидалась ошибка AppError, но её не было');
 }
 
-function errorOfSync(fn: () => unknown): DomainError {
+function errorOfSync(fn: () => unknown): AppError {
   try {
     fn();
   } catch (e) {
-    expect(e).toBeInstanceOf(DomainError);
-    return e as DomainError;
+    expect(e).toBeInstanceOf(AppError);
+    return e as AppError;
   }
-  throw new Error('Ожидалась ошибка DomainError, но её не было');
+  throw new Error('Ожидалась ошибка AppError, но её не было');
 }
 
 describe('resolvePublishingOrganization (2.6)', () => {

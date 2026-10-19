@@ -1,18 +1,13 @@
 # Контракт API: организации, панель организатора, площадки
 
 Зона участника 2. Модели и статусы — [DATA_MODEL.md](../DATA_MODEL.md), таблицы — [DB_SCHEMA.md](../DB_SCHEMA.md). Общий индекс контракта — [api.md](../api.md). Меняешь контракт — меняешь этот файл в том же PR.
-Схемы Zod будут лежать в `packages/shared/src/organizations.ts` и `venues.ts` (после появления каркаса), код — в `apps/api/src/modules/{organizations,organizer-panel,venues}`.
+Схемы Zod лягут в `packages/shared/src/organizations.ts` и `venues.ts`, код — в `apps/api/src/modules/{organizations,organizer-panel,venues}`.
 
-## Общие соглашения (предложение для всего API)
+## Общие соглашения
 
-- Префикс `/api`, JSON в UTF-8. Идентификаторы — строки (UUID). Время — ISO 8601, UTC.
-- Сессия — `HttpOnly`-cookie (вход делает участник 3). Роль берётся из сессии на сервере, из тела запроса никогда.
-- Ошибка всегда одного вида:
-  ```json
-  { "error": { "code": "ORG_NOT_APPROVED", "message": "Организация ещё не допущена администратором", "fields": { "name": "Слишком короткое название" } } }
-  ```
-  `message` — готовый русский текст для показа человеку; `fields` — только для 422.
-- Коды HTTP: 400 неверный запрос, 401 нет входа, 403 нет прав, 404 не найдено, 409 конфликт состояния, 422 ошибка проверки полей.
+Формат ошибок, общие коды, вход по cookie и `requireRole` описаны в [api.md](../api.md) и не повторяются здесь. Свои коды модуля (`ORG_NOT_APPROVED`, `ORG_NOT_FOUND`, `INVALID_BBOX` и другие) указаны в таблицах ниже. Если маршрут закрыт `requireRole(...)`, чужая роль получает общий `403 FORBIDDEN`, без входа — `401 UNAUTHORIZED`.
+
+- Идентификаторы — строки (UUID). Время — ISO 8601, UTC.
 - Списки с пагинацией: `limit` (1–100, по умолчанию 20) и `offset`; ответ `{ "items": [], "total": 0 }`.
 
 ## Права доступа
@@ -64,8 +59,8 @@ type OrganizationOwner = OrganizationPublic & {
 
 | Метод и путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- |
-| `POST /api/organizations` | `organization`, у которой ещё нет организации | `{ name, description, activity, city?, contacts?, sportIds: string[] }` (1–10 видов спорта) | `201` `OrganizationOwner` со статусом `pending` | 401; 403 `WRONG_ROLE`; 409 `ORG_ALREADY_EXISTS`; 422 |
-| `GET /api/organizations/me` | `organization` | — | `200` `OrganizationOwner` | 401; 403 `WRONG_ROLE`; 404 `ORG_NOT_FOUND` (организации ещё нет: фронт показывает форму подачи) |
+| `POST /api/organizations` | `organization`, у которой ещё нет организации | `{ name, description, activity, city?, contacts?, sportIds: string[] }` (1–10 видов спорта) | `201` `OrganizationOwner` со статусом `pending` | 401; 403 `FORBIDDEN`; 409 `ORG_ALREADY_EXISTS`; 422 |
+| `GET /api/organizations/me` | `organization` | — | `200` `OrganizationOwner` | 401; 403 `FORBIDDEN`; 404 `ORG_NOT_FOUND` (организации ещё нет: фронт показывает форму подачи) |
 | `PATCH /api/organizations/me` | `organization`, владелец | любые поля из создания, частично | `200` `OrganizationOwner`. **Статус не меняется** | 404; 409 `ORG_NAME_TAKEN` (имя уже у допущенной организации); 422 |
 | `POST /api/organizations/me/resubmit` | `organization`, только при `rejected` | — | `200` `OrganizationOwner`: статус `pending`, причина и решение очищены | 404; 409 `ORG_NOT_REJECTED` |
 | `GET /api/organizations` | любой | `q?`, `sportId?`, `city?`, `limit?`, `offset?` | `200` `{ items: OrganizationPublic[], total }`, только `approved`, сортировка по названию | 422 |

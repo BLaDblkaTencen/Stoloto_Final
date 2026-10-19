@@ -1,6 +1,6 @@
 // Жизненный цикл организации: что можно создать, как подать заявку повторно, кто что видит.
 // Решение по заявке (approve/reject) принимает только модуль admin (участник 3): здесь его нет.
-import { DomainError } from '../../lib/domain-error';
+import { AppError } from '../../lib/errors';
 import type {
   ActingUser,
   OrganizationOwnerDto,
@@ -24,14 +24,14 @@ export function assertCanCreateOrganization(
   existing: OrganizationRecord | null,
 ): void {
   if (user.role !== 'organization') {
-    throw new DomainError(
+    throw new AppError(
       403,
       'WRONG_ROLE',
       'Создать организацию может только аккаунт, зарегистрированный как организация',
     );
   }
   if (existing) {
-    throw new DomainError(409, 'ORG_ALREADY_EXISTS', 'У вашего аккаунта уже есть организация');
+    throw new AppError(409, 'ORG_ALREADY_EXISTS', 'У вашего аккаунта уже есть организация');
   }
 }
 
@@ -43,7 +43,7 @@ export function buildResubmitChanges(org: OrganizationRecord): {
   reviewedAt: null;
 } {
   if (org.status !== 'rejected') {
-    throw new DomainError(
+    throw new AppError(
       409,
       'ORG_NOT_REJECTED',
       'Подать заявку заново можно только после отклонения',
@@ -67,7 +67,7 @@ export function selectOrganizationView(
   const isAdmin = viewer?.role === 'admin';
   if (isOwner || isAdmin) return 'owner';
   if (org.status === 'approved') return 'public';
-  throw new DomainError(404, 'ORG_NOT_FOUND', 'Организация не найдена');
+  throw new AppError(404, 'ORG_NOT_FOUND', 'Организация не найдена');
 }
 
 export function toOrganizationPublic(
