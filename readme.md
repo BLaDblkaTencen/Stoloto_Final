@@ -63,12 +63,15 @@ docs                задачи, модель данных, контракт AP
 
 ## Демо-аккаунты
 
-Пароль у всех: `demo-sport-2026`. На экране входа есть кнопки «Войти как…».
+Пароль у всех: `demo-sport-2026`. Первые три входят кнопками «Войти как…» на экране входа.
 
 | Роль | Email |
 | --- | --- |
 | Участник | `user1@demo.local` |
-| Организация | `org.approved@demo.local` |
+| Организация (допущена) | `org.approved@demo.local` |
 | Администратор | `admin@demo.local` |
+| Участники | `user2@demo.local`, `user3@demo.local` |
+| Организация (заявка на рассмотрении) | `org.pending@demo.local` |
+| Организация (заявка отклонена) | `org.rejected@demo.local` |
 
-Полный список — [docs/DEMO_DATA.md](docs/DEMO_DATA.md).
+Какими аккаунтами и на каких событиях пройти шесть сценариев ТЗ — [docs/DEMO_DATA.md](docs/DEMO_DATA.md).

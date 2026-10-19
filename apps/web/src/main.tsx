@@ -9,8 +9,12 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router';
+import { z } from 'zod';
 import { router } from './app/router';
 import { queryClient } from './shared/api/queryClient';
+
+// Стандартные ошибки Zod по-русски — для форм, где в схеме не задан свой текст.
+z.config(z.locales.ru());
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
