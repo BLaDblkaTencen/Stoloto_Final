@@ -672,8 +672,16 @@ function FeedAction({ event }: { event: EventListItem }) {
   }
   if (event.joinMode === 'request') {
     return (
-      <ButtonLink to={href} variant="dark">
+      // Белая, со стрелкой в сиреневом кружке — в цвет плашки «По заявке» и кнопки на странице
+      // встречи: заявку подают там, эта кнопка ведёт к ней.
+      <ButtonLink to={href} variant="secondary" className="gap-2.5 pr-1.5">
         Подать заявку
+        <span
+          aria-hidden="true"
+          className="inline-flex size-8 items-center justify-center rounded-full border-[1.5px] border-ink bg-status-request"
+        >
+          <Icon name="arrowRight" size={16} />
+        </span>
       </ButtonLink>
     );
   }

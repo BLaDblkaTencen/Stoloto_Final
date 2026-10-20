@@ -3,7 +3,7 @@
 import { Link, Outlet } from 'react-router';
 import { AccountMenu } from '../modules/auth/AccountMenu';
 import { useMe } from '../modules/auth/api';
-import { ButtonLink, Icon } from '../shared/ui';
+import { Icon } from '../shared/ui';
 import { MainNav } from './MainNav';
 import { PageBackground } from './PageBackground';
 
@@ -30,10 +30,17 @@ export function Layout() {
         <div className="flex flex-wrap items-center gap-3">
           <AccountMenu />
           {canCreate && (
-            <ButtonLink to="/events/new" variant="dark">
-              <Icon name="plus" />
-              Создать встречу
-            </ButtonLink>
+            // Двухцветная кнопка: жёлтый сегмент с плюсом, как логотип, и белое поле, как «Войти».
+            // Заметна, но не перетягивает внимание, как сплошная тёмная.
+            <Link
+              to="/events/new"
+              className="inline-flex min-h-[var(--control-height)] items-stretch overflow-hidden rounded-md border-2 border-ink bg-surface text-sm font-semibold text-ink no-underline shadow-sm transition-[translate,box-shadow] duration-100 hover:-translate-x-px hover:-translate-y-px hover:text-ink hover:shadow-md active:translate-x-0.5 active:translate-y-0.5 active:shadow-none"
+            >
+              <span className="inline-flex w-11 items-center justify-center border-r-2 border-ink bg-accent">
+                <Icon name="plus" />
+              </span>
+              <span className="inline-flex items-center px-4">Создать встречу</span>
+            </Link>
           )}
         </div>
       </header>
