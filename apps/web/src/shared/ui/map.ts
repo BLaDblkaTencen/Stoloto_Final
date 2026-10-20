@@ -34,13 +34,22 @@ export const PIN_SIZE = SIZE.normal;
 /** «Капля» — круг и острый конец снизу: высота ≈ 1,21 ширины (½ + √2⁄2). */
 const DROP_HEIGHT = 0.5 + Math.SQRT1_2;
 
+/** Уровень карты, на котором метка полного размера: обзор города. */
+const FULL_ZOOM = 13;
+
 /**
- * Масштаб метки от масштаба карты: на обзоре города — полный размер, при приближении метка
- * уменьшается (до 0,6 на 17-м уровне), не закрывает соседние и точнее стоит на месте встречи.
+ * Масштаб метки от масштаба карты: полный размер — на обзоре города (13-й уровень).
+ * При отдалении метка уменьшается на 15% за уровень, не мельче половины (на 10-м уровне 21 px:
+ * весь город — цветные точки, а не крупные значки). При приближении — на 10% за уровень, до 0,6
+ * с 17-го: не закрывает соседние и дома вокруг и точнее стоит на месте встречи.
  */
 export function pinScale(zoom: number) {
-  return Math.min(1, Math.max(0.6, 1 - (zoom - 13) * 0.1));
+  if (zoom < FULL_ZOOM) return Math.max(0.5, 1 - (FULL_ZOOM - zoom) * 0.15);
+  return Math.max(0.6, 1 - (zoom - FULL_ZOOM) * 0.1);
 }
+
+/** Замок «По заявке» уменьшается вместе с меткой, но не мельче этой доли: режим должен читаться. */
+const LOCK_MIN_SCALE = 0.6;
 
 const svg = (icon: IconName, size: number, stroke: string, width: number) =>
   `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${stroke}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICON_PATHS[icon]}"/></svg>`;
@@ -89,7 +98,7 @@ export function pinIcon({
     .filter(Boolean)
     .join(' ');
   const lock = locked
-    ? `<span class="pin__lock">${svg('lock', Math.round(10 * Math.max(scale, 0.75)), '#fff', 2.6)}</span>`
+    ? `<span class="pin__lock">${svg('lock', Math.round(10 * Math.max(scale, LOCK_MIN_SCALE)), '#fff', 2.6)}</span>`
     : '';
   const fill = muted ? 'var(--color-surface-muted)' : color;
   // Над меткой: попап и подпись открываются от её верха, а не закрывают её.
@@ -145,9 +154,19 @@ export const venuePin = (o: {
   });
 
 /**
+ * Наименьшая группа по числу цифр. Число — Rubik 16px (≈ 11 px на цифру, высота 12 px), внутри
+ * круга — кольцо и две обводки (16 px), и число должно поместиться в белый круг с запасом,
+ * а не касаться его обводки.
+ */
+const CLUSTER_MIN = [34, 42, 50] as const;
+/** Самая маленькая группа: ближе этого на экране метки и группы налезают друг на друга. */
+export const CLUSTER_MIN_SIZE = CLUSTER_MIN[0];
+
+/**
  * Группа меток, которые на этом масштабе налезли бы друг на друга: встречи — круг с числом,
  * кольцо — цвета видов спорта внутри (до шести); площадки — жёлтый квадрат с числом.
- * Чем больше меток, тем крупнее группа.
+ * Чем больше меток, тем крупнее группа; с отдалением она уменьшается вместе с метками,
+ * но не мельче, чем нужно числу (CLUSTER_MIN).
  */
 export function clusterPin({
   count,
@@ -163,7 +182,8 @@ export function clusterPin({
   scale?: number;
 }) {
   const base = count < 5 ? 41 : count < 10 ? 46 : 51;
-  const size = Math.round(base * Math.max(scale, 0.8));
+  const digits = Math.min(String(count).length, CLUSTER_MIN.length);
+  const size = Math.max(Math.round(base * scale), CLUSTER_MIN[digits - 1]);
   const ring = [...new Set(colors)].slice(0, 6);
   const step = 100 / Math.max(ring.length, 1);
   const gradient = ring.length

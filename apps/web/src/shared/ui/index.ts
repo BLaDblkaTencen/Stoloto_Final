@@ -19,6 +19,7 @@ export { EmptyState, ErrorState, Skeleton, SkeletonList } from './States';
 export { TextareaField } from './TextareaField';
 export { TextField } from './TextField';
 export {
+  CLUSTER_MIN_SIZE,
   clusterPin,
   eventPin,
   mePin,

@@ -41,7 +41,7 @@ function PlaceMarker({
   sportSlug,
   joinMode = 'free',
 }: Omit<PlaceMapViewProps, 'className'>) {
-  // Вблизи метки мельче и точнее стоят на месте (pinScale).
+  // Размер метки от масштаба карты, как на остальных картах (pinScale).
   const scale = pinScale(useMapZoom());
   const icon = sportSlug
     ? cachedIcon(`event:${sportSlug}:${joinMode}:false:${scale}`, () =>

@@ -6,7 +6,8 @@
 // площадок встречи и площадки группируются вместе, чтобы группы не закрывали друг друга.
 // Нажатие на группу приближает карту к ней, а всё, что в одном месте, показывает списком.
 // Наведение — название и время встречи. Метка с открытым попапом и выбранная встреча в группы
-// не уходят.
+// не уходят. Нажатие на метку издалека сначала приближает карту к ней (видно улицы и дома
+// вокруг), попап показывается по прилёте.
 import { EVENT_TIMEZONE, type EventMapItem } from '@sport/shared/schemas/events';
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { Bbox, Venue } from '@sport/shared/schemas/venues';
@@ -29,8 +30,8 @@ import { ariaLabel, BaseMap, cachedIcon, useMapZoom } from './BaseMap';
 import {
   countOf,
   expandGroup,
-  GROUP_RADIUS,
   GroupMarker,
+  groupRadius,
   groupKey,
   HEAD_OFFSET,
   useScreenGroups,
@@ -68,6 +69,22 @@ const dateFormat = new Intl.DateTimeFormat('ru', {
 const when = (event: EventMapItem) => dateFormat.format(new Date(event.startsAt));
 const meetings = (n: number) => countOf(n, ['встреча', 'встречи', 'встреч']);
 const places = (n: number) => countOf(n, ['площадка', 'площадки', 'площадок']);
+
+/** Масштаб «где именно»: улицы с названиями и дома вокруг метки. */
+const PLACE_ZOOM = 16;
+const FLY_SECONDS = 0.6;
+/**
+ * Автосдвиг попапа: карточка не заходит под кнопки карты (масштаб слева, «Во весь экран» и
+ * «Где я» справа — до 122 px от верха) и не обрезает свой крестик, который выступает за угол
+ * карточки на 16 px. На телефоне попап почти во всю ширину карты, поэтому важен отступ сверху.
+ */
+const POPUP_TOP = 144;
+const POPUP_PAN = {
+  autoPanPaddingTopLeft: [12, POPUP_TOP] as L.PointTuple,
+  autoPanPaddingBottomRight: [28, 12] as L.PointTuple,
+};
+/** Место над точкой: попап встречи (230–280 px), его хвостик и метка под ним. */
+const POPUP_ROOM = 320;
 
 export function EventsMapView({
   events,
@@ -172,11 +189,14 @@ function Markers({
   const { groups, position } = useScreenGroups(
     items.filter((item) => !pinned(item)),
     (item) => [item.lat, item.lng],
-    GROUP_RADIUS * scale,
+    groupRadius(scale),
   );
 
   const opened = (id: string) => ({
-    onOpen: () => setOpenId(id),
+    onOpen: (event: L.PopupEvent) => {
+      setOpenId(id);
+      approach(map, event.popup);
+    },
     onClose: () => setOpenId((current) => (current === id ? null : current)),
   });
   const single = (item: Item) =>
@@ -270,6 +290,7 @@ function Markers({
           minWidth={280}
           maxWidth={320}
           maxHeight={320}
+          {...POPUP_PAN}
           eventHandlers={{ remove: () => setList(null) }}
         >
           <SamePlaceList items={list.items} createHref={createHref} />
@@ -326,7 +347,7 @@ function VenueMarker({
   here: EventMapItem[];
   createHref: ((venue: Venue) => string) | null;
   scale: number;
-  onOpen: () => void;
+  onOpen: (event: L.PopupEvent) => void;
   onClose: () => void;
 }) {
   const suitable = venue.suitable ?? true;
@@ -347,7 +368,7 @@ function VenueMarker({
         {busy && <span className="map-tip__muted">Здесь {meetings(here.length)}</span>}
       </Tooltip>
       {/* maxHeight: попап выше карты Leaflet сдвигает её при каждой перерисовке без конца. */}
-      <Popup minWidth={300} maxWidth={320} maxHeight={380}>
+      <Popup minWidth={300} maxWidth={320} maxHeight={380} {...POPUP_PAN}>
         <div className="bg-surface text-ink">
           <VenueCard venue={venueCardData(venue)} compact />
           <div className="flex flex-col gap-2 px-3.5 pb-3.5">
@@ -389,7 +410,7 @@ function EventMarker({
   selected: boolean;
   scale: number;
   onSelect?: (id: string) => void;
-  onOpen: () => void;
+  onOpen: (event: L.PopupEvent) => void;
   onClose: () => void;
   markers: Map<string, L.Marker>;
 }) {
@@ -417,7 +438,7 @@ function EventMarker({
         <span className="map-tip__title">{event.title}</span>
         <span className="map-tip__muted">{when(event)}</span>
       </Tooltip>
-      <Popup minWidth={300} maxWidth={300}>
+      <Popup minWidth={300} maxWidth={300} {...POPUP_PAN}>
         <EventPopup event={event} sport={sport} />
       </Popup>
     </Marker>
@@ -474,7 +495,38 @@ function PopupLink({
   );
 }
 
-const FLY_SECONDS = 0.6;
+/**
+ * Центр карты, при котором точка at на масштабе zoom стоит низко, а над ней помещается её попап
+ * ниже кнопок карты (POPUP_TOP): после перелёта автосдвигу двигать почти нечего.
+ */
+function landing(map: L.Map, at: L.LatLngExpression, zoom: number) {
+  const height = map.getSize().y;
+  const y = Math.min(height - 64, POPUP_TOP + POPUP_ROOM);
+  return map.unproject(map.project(at, zoom).subtract([0, y - height / 2]), zoom);
+}
+
+/**
+ * Открыли попап метки издалека (нажатие, Enter): карта сначала летит к метке до PLACE_ZOOM, чтобы
+ * было видно, где именно встреча, а попап показывается по прилёте. Попап при этом уже открыт,
+ * только скрыт: метка с открытым попапом не уходит в группу, пока меняется масштаб. Автосдвиг
+ * попапа (у всех попапов карты он включён) — тоже по прилёте: во время перелёта он спорил бы
+ * с анимацией.
+ */
+function approach(map: L.Map, popup: L.Popup) {
+  const at = popup.getLatLng();
+  const element = popup.getElement();
+  if (!at || !element || map.getZoom() >= PLACE_ZOOM) return;
+  popup.options.autoPan = false;
+  element.classList.add('is-waiting');
+  map.flyTo(landing(map, at, PLACE_ZOOM), PLACE_ZOOM, { duration: FLY_SECONDS });
+  // Подписка после flyTo: он останавливает начатый автосдвиг, и тот сразу сообщает moveend.
+  // Нажали снова, пока карта летит, — по прилёте сработают обе подписки, обе включат автосдвиг.
+  map.once('moveend', () => {
+    popup.options.autoPan = true;
+    element.classList.remove('is-waiting');
+    if (map.hasLayer(popup)) popup.update();
+  });
+}
 
 /**
  * Переход к встрече по «На карте»: карта летит к точке, а попап открывается, когда метка есть
@@ -504,7 +556,10 @@ function FocusWatcher({
     if (!focus) return;
     pending.current = focus.id;
     flying.current = true;
-    map.flyTo([focus.lat, focus.lng], Math.max(map.getZoom(), 15), { duration: FLY_SECONDS });
+    // Тот же масштаб и та же точка, что у нажатия на метку: долетели — попап открывается
+    // без второго перелёта и без сдвига карты под него.
+    const zoom = Math.max(map.getZoom(), PLACE_ZOOM);
+    map.flyTo(landing(map, [focus.lat, focus.lng], zoom), zoom, { duration: FLY_SECONDS });
     // Попап — после перелёта: иначе автосдвиг под попап спорит с анимацией.
     const timer = setTimeout(
       () => {
