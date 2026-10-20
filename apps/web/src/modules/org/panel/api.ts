@@ -1,5 +1,6 @@
 // Запросы панели организатора (задача 2.7). Владелец: участник 2. Контракт — docs/api/organizations.md,
 // раздел 2. Решения по заявкам принимает сервис записи участника 1, здесь только вызовы.
+import type { EventDetails } from '@sport/shared/schemas/events';
 import type {
   Decision,
   OrganizerRegistration,
@@ -15,6 +16,20 @@ export function useEventRegistrations(eventId: string) {
   return useQuery({
     queryKey: panelKey(eventId),
     queryFn: () => api<OrganizerRegistrations>(`/events/${eventId}/organizer/registrations`),
+  });
+}
+
+/** Закрыть запись до начала встречи или открыть её снова: PATCH события участника 1. */
+export function useSetRegistrationClosed(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (registrationClosed: boolean) =>
+      api<EventDetails>(`/events/${eventId}`, { method: 'PATCH', json: { registrationClosed } }),
+    onSuccess: (event) => {
+      queryClient.setQueryData(['events', 'detail', eventId], event);
+      // Пометка «Запись закрыта» в ленте и в «Моих мероприятиях».
+      void queryClient.invalidateQueries({ queryKey: ['events'] });
+    },
   });
 }
 

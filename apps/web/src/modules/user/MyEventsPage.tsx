@@ -21,6 +21,7 @@ import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { useMyEvents, useMyRegistrations, type Scope } from './api';
 import { MetaLine, SportTile } from './EventBits';
+import { MISSED_LABEL, MISSED_TEXT } from './JoinPanel';
 import { formatSeats, formatWhen, LOCAL_TIME_NOTE, plural } from './format';
 import { AttendanceModal } from './reviews/AttendanceModal';
 import { ReviewModal } from './reviews/ReviewModal';
@@ -123,13 +124,19 @@ function Joined({ scope }: { scope: Scope }) {
   return (
     <ul className="grid gap-4 lg:grid-cols-2">
       {list.data.items.map((item) => {
-        const hint = REGISTRATION_HINT[item.myRegistration.status];
+        // Заявка, на которую не ответили до начала: «ждёт решения» у прошедшей встречи — неправда.
+        const missed = scope === 'past' && item.myRegistration.status === 'pending';
+        const hint = missed ? MISSED_TEXT : REGISTRATION_HINT[item.myRegistration.status];
         return (
           <EventRow key={item.id} event={item}>
-            {item.status === 'published' ? (
-              <StatusBadge kind="registration" status={item.myRegistration.status} />
-            ) : (
+            {item.status !== 'published' ? (
               <StatusBadge kind="event" status={item.status} />
+            ) : missed ? (
+              <Badge tone="neutral" icon="clock">
+                {MISSED_LABEL}
+              </Badge>
+            ) : (
+              <StatusBadge kind="registration" status={item.myRegistration.status} />
             )}
             <span className="text-sm text-ink-muted">
               {item.status !== 'published'
@@ -162,11 +169,25 @@ function Organized({ scope }: { scope: Scope }) {
       {list.data.items.map((item) => (
         <EventRow key={item.id} event={item}>
           <StatusBadge kind="event" status={item.status} />
-          {item.pendingCount > 0 && (
-            <Badge tone="warning">
-              {plural(item.pendingCount, ['новая заявка', 'новые заявки', 'новых заявок'])}
+          {scope === 'upcoming' && item.registrationClosed && (
+            <Badge tone="neutral" icon="lock">
+              Запись закрыта
             </Badge>
           )}
+          {item.pendingCount > 0 &&
+            (scope === 'past' ? (
+              <Badge tone="neutral" icon="clock">
+                {plural(item.pendingCount, [
+                  'заявка без ответа',
+                  'заявки без ответа',
+                  'заявок без ответа',
+                ])}
+              </Badge>
+            ) : (
+              <Badge tone="warning">
+                {plural(item.pendingCount, ['новая заявка', 'новые заявки', 'новых заявок'])}
+              </Badge>
+            ))}
           {item.status !== 'published' && item.moderationReason && (
             <span className="text-sm text-ink-muted">Причина: {item.moderationReason}</span>
           )}

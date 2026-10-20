@@ -22,8 +22,9 @@ import {
   Modal,
   SkeletonList,
 } from '../../../shared/ui';
+import { plural } from '../../user/format';
 import { Reliability } from '../../user/reviews/ReviewList';
-import { useDecideRegistration, useEventRegistrations } from './api';
+import { useDecideRegistration, useEventRegistrations, useSetRegistrationClosed } from './api';
 
 const TAB_LABELS: Record<RegistrationStatus, string> = {
   pending: 'Заявки',
@@ -66,6 +67,8 @@ export function OrganizerPanel({ event }: { event: EventDetails }) {
   const tab = chosenTab ?? (counts && counts.pending > 0 ? 'pending' : 'confirmed');
   const canDecide = event.status === 'published' && !event.isPast;
   const full = event.capacity !== null && event.participantsCount >= event.capacity;
+  // Заявки, на которые не ответили до начала: решить по ним сервер уже не даст.
+  const missed = event.isPast && counts ? counts.pending : 0;
 
   const items = registrations.data?.items.filter((item) => item.status === tab) ?? [];
 
@@ -86,6 +89,14 @@ export function OrganizerPanel({ event }: { event: EventDetails }) {
           ? 'Запись по заявке: примите или отклоните каждую. Человек сразу увидит решение в карточке события и в «Моих мероприятиях».'
           : 'Свободная запись: люди попадают в список участников сразу, без вашего решения.'}
       </p>
+
+      {canDecide && <RegistrationSwitch event={event} />}
+      {missed > 0 && (
+        <Alert tone="warning">
+          Встреча уже прошла. Без ответа: {plural(missed, ['заявка', 'заявки', 'заявок'])} — люди
+          видят пометку «Заявка не рассмотрена».
+        </Alert>
+      )}
 
       {decide.error && (
         <Alert>
@@ -129,9 +140,15 @@ export function OrganizerPanel({ event }: { event: EventDetails }) {
                     <Link to={`/users/${item.user.id}`} className="font-semibold">
                       {item.user.name}
                     </Link>
-                    <Badge tone={STATUS_BADGE[item.status].tone}>
-                      {STATUS_BADGE[item.status].label}
-                    </Badge>
+                    {item.status === 'pending' && event.isPast ? (
+                      <Badge tone="neutral" icon="clock">
+                        Не рассмотрена
+                      </Badge>
+                    ) : (
+                      <Badge tone={STATUS_BADGE[item.status].tone}>
+                        {STATUS_BADGE[item.status].label}
+                      </Badge>
+                    )}
                   </p>
                   <p className="text-sm text-ink-muted">
                     {item.status === 'pending' ? 'Заявка от ' : 'Запись от '}
@@ -208,5 +225,44 @@ export function OrganizerPanel({ event }: { event: EventDetails }) {
         </p>
       </Modal>
     </Card>
+  );
+}
+
+/**
+ * Закрыть запись, когда состав набран, и открыть снова. Только до начала: потом запись закрыта
+ * и так. Записанные остаются, ждущие заявки по-прежнему рассматриваются в списке ниже.
+ */
+function RegistrationSwitch({ event }: { event: EventDetails }) {
+  const toggle = useSetRegistrationClosed(event.id);
+  const closed = event.registrationClosed;
+  return (
+    <div className="flex flex-col gap-3 rounded-md border-2 border-ink bg-surface p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-[1_1_280px] flex-col items-start gap-1.5">
+          <Badge tone={closed ? 'neutral' : 'success'} icon={closed ? 'lock' : 'door'}>
+            {closed ? 'Запись закрыта' : 'Запись открыта'}
+          </Badge>
+          <p className="text-sm text-ink-muted">
+            {closed
+              ? 'Новые люди записаться не могут. Записанные остаются, заявки можно рассмотреть.'
+              : 'Состав набран? Закройте запись — встреча останется в ленте с пометкой «Запись закрыта».'}
+          </p>
+        </div>
+        <Button
+          variant="secondary"
+          loading={toggle.isPending}
+          onClick={() => toggle.mutate(!closed)}
+        >
+          {closed ? 'Открыть запись снова' : 'Закрыть запись'}
+        </Button>
+      </div>
+      {toggle.error && (
+        <Alert>
+          {toggle.error instanceof ApiError
+            ? toggle.error.message
+            : 'Не получилось. Попробуйте ещё раз'}
+        </Alert>
+      )}
+    </div>
   );
 }

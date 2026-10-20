@@ -659,6 +659,14 @@ function FeedAction({ event }: { event: EventListItem }) {
       </ButtonLink>
     );
   }
+  if (event.registrationClosed) {
+    return (
+      <ButtonLink to={href} variant="secondary" aria-label={`Запись закрыта: ${event.title}`}>
+        <Icon name="lock" size={16} />
+        Запись закрыта
+      </ButtonLink>
+    );
+  }
   if (event.freeSlots === 0) {
     return (
       <ButtonLink to={href} variant="secondary" aria-label={`Мест нет: ${event.title}`}>
