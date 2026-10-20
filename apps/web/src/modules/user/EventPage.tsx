@@ -71,9 +71,9 @@ function EventView({ event }: { event: EventDetails }) {
         </Alert>
       )}
 
-      {event.permissions.isOrganizer && <OrganizerPanel event={event} />}
-
-      {/* На телефоне: описание → запись → обсуждение; на широком экране запись справа на всю высоту. */}
+      {/* На телефоне: описание → запись → обсуждение; на широком экране запись справа на всю высоту.
+          Организатору справа вместо записи и участников — панель организатора (участник 2): на
+          телефоне она первой, чтобы до заявок не листать всё описание. */}
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
         <Card className="flex flex-col gap-6">
           <header className="flex flex-col gap-3">
@@ -146,10 +146,16 @@ function EventView({ event }: { event: EventDetails }) {
           </section>
         </Card>
 
-        <div className="flex flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
-          <JoinPanel event={event} />
-          <Participants event={event} />
-        </div>
+        {event.permissions.isOrganizer ? (
+          <div className="flex flex-col gap-6 max-lg:order-first lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <OrganizerPanel event={event} />
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+            <JoinPanel event={event} />
+            <Participants event={event} />
+          </div>
+        )}
 
         <div className="lg:col-start-1">
           <Discussion event={event} />
@@ -169,11 +175,7 @@ function Participants({ event }: { event: EventDetails }) {
           Имена видны организатору и подтверждённым участникам.
         </p>
       ) : event.participants.length === 0 ? (
-        <p className="text-ink-muted">
-          {event.permissions.isOrganizer
-            ? 'Пока никто не записался.'
-            : 'Пока никто не записался — будьте первым!'}
-        </p>
+        <p className="text-ink-muted">Пока никто не записался — будьте первым!</p>
       ) : (
         <ul className="flex flex-col gap-2">
           {event.participants.map((person) => (
