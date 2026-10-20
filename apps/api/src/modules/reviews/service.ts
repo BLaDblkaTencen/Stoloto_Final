@@ -2,6 +2,7 @@
 // Итоги не хранятся, а считаются запросом по видимым отзывам (visible ниже). «Мои мероприятия»,
 // карточка события и панель организатора берут их отсюда. Контракт — docs/api/events.md, «Отзывы».
 import {
+  DEFAULT_EVENT_HOURS,
   REVIEW_WINDOW_DAYS,
   type Attendance,
   type AttendanceData,
@@ -38,7 +39,9 @@ import {
 
 const eventNotFound = () => new AppError(404, 'EVENT_NOT_FOUND', 'Событие не найдено');
 const at = (date: Date) => sql`${date.toISOString()}::timestamptz`;
-const endedBy = (now: Date) => sql`coalesce(${events.endsAt}, ${events.startsAt}) <= ${at(now)}`;
+/** То же, что eventEnd в rules.ts: без окончания — через DEFAULT_EVENT_HOURS после начала. */
+const endExpr = sql`coalesce(${events.endsAt}, ${events.startsAt} + ${sql.raw(`interval '${DEFAULT_EVENT_HOURS} hours'`)})`;
+const endedBy = (now: Date) => sql`${endExpr} <= ${at(now)}`;
 
 /**
  * Слепые отзывы: отзыв виден, когда вторая сторона тоже высказалась или окно закрылось.
@@ -48,7 +51,7 @@ const endedBy = (now: Date) => sql`coalesce(${events.endsAt}, ${events.startsAt}
  */
 function visible(now: Date): SQL {
   return sql`(${events.status} = 'published' and (
-    coalesce(${events.endsAt}, ${events.startsAt}) + ${sql.raw(`interval '${REVIEW_WINDOW_DAYS} days'`)} < ${at(now)}
+    ${endExpr} + ${sql.raw(`interval '${REVIEW_WINDOW_DAYS} days'`)} < ${at(now)}
     or (${reviews.direction} = 'participant_to_organizer' and exists (
       select 1 from reviews c
       where c.event_id = ${reviews.eventId} and c.direction = 'organizer_to_participant'))
