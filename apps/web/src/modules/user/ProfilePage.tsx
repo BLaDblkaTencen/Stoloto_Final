@@ -292,7 +292,7 @@ function ProfileEventCard({ event, status }: { event: EventListItem; status?: Re
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
         <h3 className="font-sans text-[19px] leading-snug font-semibold">
-          <Link to={`/events/${event.id}`} className="no-underline hover:underline">
+          <Link to={`/events/${event.id}`} className="tap-area no-underline hover:underline">
             {event.title}
           </Link>
         </h3>
@@ -383,7 +383,7 @@ function ProfileForm({ profile }: { profile: UserProfile }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to={`/users/${profile.id}`} className="self-start font-semibold">
+      <Link to={`/users/${profile.id}`} className="tap-area self-start font-semibold">
         ← Мой профиль
       </Link>
       <div>

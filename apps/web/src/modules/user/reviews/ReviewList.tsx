@@ -113,7 +113,7 @@ function ReviewItem({ review }: { review: Review }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-3">
           <Avatar name={review.author.name} size={36} />
-          <Link to={authorLink} className="font-semibold">
+          <Link to={authorLink} className="tap-area font-semibold">
             {review.author.name}
           </Link>
         </span>
@@ -126,8 +126,10 @@ function ReviewItem({ review }: { review: Review }) {
             : 'Отзыв организатора'}
         </Badge>
         <span>
-          <Link to={`/events/${review.event.id}`}>{review.event.title}</Link> ·{' '}
-          {formatShort(review.event.startsAt)}
+          <Link to={`/events/${review.event.id}`} className="tap-area">
+            {review.event.title}
+          </Link>{' '}
+          · {formatShort(review.event.startsAt)}
         </span>
       </p>
       {review.attended === false && (

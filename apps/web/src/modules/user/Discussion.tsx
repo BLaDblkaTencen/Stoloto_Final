@@ -102,21 +102,24 @@ export function Discussion({ event }: { event: EventDetails }) {
 
 function Message({ comment }: { comment: Comment }) {
   const { author } = comment;
+  // У автора события плашка всегда «Организатор»: по одному названию клуба не понять, что
+  // отвечает организатор. Название организации (сервер кладёт его в badgeLabel) — рядом текстом.
+  const organization =
+    author.badge === 'organizer' && author.badgeLabel !== 'Организатор' ? author.badgeLabel : null;
   return (
     <article className="flex gap-3">
       <Avatar name={author.name} size={40} />
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-semibold">{author.name}</span>
-          {author.badgeLabel && (
-            // Длинное название организации переносится: плашка в ответе с отступом иначе
-            // растягивала страницу события шире экрана телефона (360px).
-            <span className="max-w-full [&>span]:whitespace-normal">
-              <Badge tone={author.badge === 'moderator' ? 'neutral' : 'free'} icon={null}>
-                {author.badgeLabel}
-              </Badge>
-            </span>
+          {author.badge && (
+            <Badge tone={author.badge === 'moderator' ? 'neutral' : 'free'} icon={null}>
+              {author.badge === 'organizer' ? 'Организатор' : author.badgeLabel}
+            </Badge>
           )}
+          {/* Длинное название организации переносится: в ответе с отступом оно иначе
+              растягивало страницу события шире экрана телефона (360px). */}
+          {organization && <span className="min-w-0 break-words">{organization}</span>}
           <time dateTime={comment.createdAt} className="text-sm text-ink-muted">
             {formatMoment(comment.createdAt)}
           </time>

@@ -294,7 +294,10 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
   return (
     <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <Link to={event ? `/events/${event.id}` : '/'} className="self-start font-semibold">
+        <Link
+          to={event ? `/events/${event.id}` : '/'}
+          className="tap-area self-start font-semibold"
+        >
           ← {event ? 'К событию' : 'Все встречи'}
         </Link>
         <h1 className="text-h2">{event ? 'Изменить встречу' : 'Новая встреча'}</h1>
@@ -485,13 +488,15 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
 
       {/* На широком экране полоса прилипает к низу: кнопка видна, где бы человек ни был. На телефоне
           она закрыла бы четверть экрана, поэтому стоит в конце формы. Полоса белая с жёлтой линией
-          сверху, с заголовком и крупной кнопкой-таблеткой: главное действие формы видно сразу. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-7 gap-y-4 rounded-xl border-2 border-t-[10px] border-ink border-t-accent bg-surface px-5 py-[22px] sm:pr-[26px] sm:pl-8 text-ink shadow-lg lg:sticky lg:bottom-4 lg:z-[1100]">
+          сверху, с заголовком и крупной кнопкой-таблеткой: главное действие формы видно сразу.
+          На невысоком экране (ноутбук до 900px) полоса тоньше — без пояснения и с меньшими
+          отступами, — иначе она закрывала низ карты места. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-7 gap-y-4 rounded-xl border-2 border-t-[10px] border-ink border-t-accent bg-surface px-5 py-[22px] sm:pr-[26px] sm:pl-8 text-ink shadow-lg lg:sticky lg:bottom-4 lg:z-[1100] lg:[@media(max-height:900px)]:py-3">
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1.5">
-          <p className="font-display text-[26px] leading-tight font-bold">
+          <p className="font-display text-[26px] leading-tight font-bold lg:[@media(max-height:900px)]:text-[22px]">
             {event ? 'Готово? Сохраняем' : 'Готово? Публикуем'}
           </p>
-          <p className="text-[18px] text-ink-muted">
+          <p className="text-[18px] text-ink-muted lg:[@media(max-height:900px)]:hidden">
             {event
               ? 'Участники увидят изменения сразу после сохранения.'
               : 'Встреча появится в ленте и на карте сразу после публикации.'}

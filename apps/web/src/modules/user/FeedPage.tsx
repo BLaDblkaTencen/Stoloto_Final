@@ -283,7 +283,7 @@ function NextRegistration() {
       ) : (
         <StatusBadge kind="event" status={next.status} />
       )}
-      <Link to="/me/events" className="ml-auto font-semibold">
+      <Link to="/me/events" className="tap-area ml-auto font-semibold">
         Все мои мероприятия →
       </Link>
     </aside>
@@ -581,7 +581,7 @@ function FeedItem({
       </div>
       <div className="flex flex-col gap-1 p-3.5">
         <h3 className="font-sans text-[19px] leading-snug font-semibold">
-          <Link to={`/events/${event.id}`} className="no-underline hover:underline">
+          <Link to={`/events/${event.id}`} className="tap-area no-underline hover:underline">
             {event.title}
           </Link>
         </h3>

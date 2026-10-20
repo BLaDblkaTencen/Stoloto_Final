@@ -125,7 +125,7 @@ function AttendanceForm({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <span className="flex items-center gap-3">
                   <Avatar name={user.name} size={40} />
-                  <Link to={`/users/${user.id}`} className="font-semibold">
+                  <Link to={`/users/${user.id}`} className="tap-area font-semibold">
                     {user.name}
                   </Link>
                 </span>

@@ -108,7 +108,9 @@ function EventRow({ event }: { event: EventListItem }) {
         <JoinModeBadge mode={event.joinMode} />
       </div>
       <h3 className="text-h3">
-        <Link to={`/events/${event.id}`}>{event.title}</Link>
+        <Link to={`/events/${event.id}`} className="tap-area">
+          {event.title}
+        </Link>
       </h3>
       <p className="flex items-center gap-2">
         <Icon name="calendar" size={18} />

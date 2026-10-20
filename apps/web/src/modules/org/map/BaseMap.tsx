@@ -15,6 +15,7 @@ import {
   TileLayer,
   useMap,
   useMapEvents,
+  ZoomControl,
 } from 'react-leaflet';
 import { Icon, MapUnavailable, mePin } from '../../../shared/ui';
 
@@ -68,9 +69,12 @@ export function BaseMap({
       className={`map-frame ${className}`}
       aria-label={label}
       attributionControl={false}
+      zoomControl={false}
     >
       {/* Без префикса «Leaflet»: его лицензия ссылки не требует. «© OpenStreetMap» обязателен (ODbL). */}
       <AttributionControl prefix={false} />
+      {/* Свои кнопки масштаба — ради русских подписей: у Leaflet «Zoom in» в подсказке и для диктора. */}
+      <ZoomControl zoomInTitle="Приблизить" zoomOutTitle="Отдалить" />
       <TileLayer
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
