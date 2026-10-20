@@ -84,7 +84,7 @@ export function JoinPanel({ event }: { event: EventDetails }) {
           )}
           <Button
             size="lg"
-            variant={byRequest ? 'dark' : 'primary'}
+            variant={byRequest ? 'request' : 'primary'}
             loading={join.isPending}
             onClick={() => join.mutate(message.trim() || null)}
           >
