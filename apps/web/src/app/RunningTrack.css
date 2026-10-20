@@ -1,0 +1,56 @@
+/*
+ * Беговая дорожка под шапкой и над вкладками внизу экрана: белые линии разметки на покрытии
+ * дорожки. Жёлтый участок — открытый раздел меню (RunningTrack.tsx).
+ */
+.running-track {
+  --track-surface: var(--sport-2);
+  position: relative;
+  flex-shrink: 0;
+  height: 20px;
+  border-block: var(--border);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--track-surface) 0 4px,
+    var(--color-surface) 4px 6px
+  );
+}
+
+/* На узком экране меню во вкладках внизу: под шапкой остаётся тонкая полоса без указателя. */
+@media (width < 80rem) {
+  .running-track--header {
+    height: 10px;
+  }
+}
+
+/* Над вкладками: снизу черты нет, дорожка прилегает к белой панели вкладок. */
+.running-track--tabs {
+  height: 16px;
+  border-bottom: 0;
+}
+
+.running-track__mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  border: var(--border);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--color-accent) 0 4px,
+    color-mix(in srgb, var(--color-ink) 14%, var(--color-accent)) 4px 6px
+  );
+  transition:
+    left 0.28s ease,
+    width 0.28s ease,
+    opacity 0.2s ease;
+}
+
+.running-track--tabs .running-track__mark {
+  bottom: 0;
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .running-track__mark {
+    transition: none;
+  }
+}
