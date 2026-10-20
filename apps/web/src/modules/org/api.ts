@@ -58,6 +58,8 @@ function storeMine(queryClient: QueryClient, org: OrganizationOwner) {
   void queryClient.invalidateQueries({
     predicate: ({ queryKey }) => queryKey[0] === 'org' && queryKey[1] !== 'mine',
   });
+  // Свой вид спорта из заявки уже в каталоге: он появится среди чипов формы и фильтров.
+  void queryClient.invalidateQueries({ queryKey: ['sports'] });
 }
 
 export function useCreateOrganization() {

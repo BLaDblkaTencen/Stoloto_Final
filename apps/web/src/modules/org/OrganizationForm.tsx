@@ -1,14 +1,17 @@
 // Форма организации: подача заявки и правка данных. Проверки — те же Zod-схемы, что на сервере.
+// Виды спорта — список и «Свой вариант», как в форме события (ТЗ: «список + свой вариант»).
 import { zodFieldErrors } from '@sport/shared';
 import {
   createOrganizationBody,
   type CreateOrganizationBody,
   type OrganizationOwner,
 } from '@sport/shared/schemas/organizations';
+import { normalizeSportName, sportNameSchema, sportSlug } from '@sport/shared/schemas/sports';
 import { useState, type FormEvent } from 'react';
 import {
   Alert,
   Button,
+  Chip,
   FieldError,
   Skeleton,
   SportChip,
@@ -50,6 +53,8 @@ export function OrganizationForm({
     contacts: initial?.contacts ?? '',
   });
   const [sportIds, setSportIds] = useState<string[]>(initial?.sports.map((s) => s.id) ?? []);
+  // Свои варианты, которых нет в каталоге: сервер добавит их при сохранении.
+  const [sportNames, setSportNames] = useState<string[]>([]);
   const [clientFields, setClientFields] = useState<Record<string, string>>({});
   const fresh = useFreshErrors(Object.keys(clientFields).length > 0 ? clientFields : serverFields);
 
@@ -65,10 +70,27 @@ export function OrganizationForm({
     );
   };
 
+  /** Свой вариант: такой уже есть в каталоге — отмечаем его, иначе добавляем новым. */
+  const addCustom = (name: string): string => {
+    fresh.edit('sportIds');
+    const slug = sportSlug(name);
+    const existing = sports.data?.find((sport) => sport.slug === slug);
+    if (existing) {
+      setSportIds((current) =>
+        current.includes(existing.id) ? current : [...current, existing.id],
+      );
+      return `«${existing.name}» уже есть в списке — отметили его`;
+    }
+    const clean = normalizeSportName(name);
+    if (sportNames.some((other) => sportSlug(other) === slug)) return `«${clean}» уже добавлен`;
+    setSportNames((current) => [...current, clean]);
+    return `Добавим «${clean}» в каталог, когда сохраните`;
+  };
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     fresh.reset();
-    const parsed = createOrganizationBody.safeParse({ ...form, sportIds });
+    const parsed = createOrganizationBody.safeParse({ ...form, sportIds, sportNames });
     if (!parsed.success) return setClientFields(zodFieldErrors(parsed.error));
     setClientFields({});
     onSubmit(parsed.data);
@@ -118,9 +140,24 @@ export function OrganizationForm({
                 onClick={() => toggleSport(sport.id)}
               />
             ))}
+            {/* Свои варианты до сохранения: нажатие убирает, как снятие отметки у чипа из списка. */}
+            {sportNames.map((name, index) => (
+              <SportChip
+                key={`new:${name}`}
+                sport={{ name, slug: sportSlug(name) }}
+                index={sports.data.length + index}
+                pressed
+                onClick={() => {
+                  fresh.edit('sportIds');
+                  setSportNames((current) => current.filter((item) => item !== name));
+                }}
+              />
+            ))}
           </div>
         )}
+        {!sports.isPending && !sports.isError && <CustomSport onAdd={addCustom} />}
         {fresh.errorOf('sportIds') && <FieldError>{fresh.errorOf('sportIds')}</FieldError>}
+        {fresh.errorOf('sportNames') && <FieldError>{fresh.errorOf('sportNames')}</FieldError>}
       </fieldset>
 
       <TextField
@@ -150,5 +187,61 @@ export function OrganizationForm({
         )}
       </div>
     </form>
+  );
+}
+
+/**
+ * «Свой вариант»: поле и кнопка «Добавить» (или Enter). Проверка — та же схема, что на сервере;
+ * под полем — что стало с названием: отметили из списка или добавим в каталог.
+ */
+function CustomSport({ onAdd }: { onAdd: (name: string) => string }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [error, setError] = useState<string>();
+  const [note, setNote] = useState<string | null>(null);
+
+  const add = () => {
+    const parsed = sportNameSchema.safeParse(name);
+    if (!parsed.success) return setError(parsed.error.issues[0]?.message);
+    setNote(onAdd(parsed.data));
+    setName('');
+    setError(undefined);
+  };
+
+  if (!open) {
+    return (
+      <Chip pressed={false} icon="plus" className="self-start" onClick={() => setOpen(true)}>
+        Свой вариант
+      </Chip>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-start gap-3">
+      <TextField
+        label="Свой вид спорта"
+        placeholder="Например: Скандинавская ходьба"
+        hint={note ?? 'Нет в списке? Впишите — новый вид спорта появится в каталоге'}
+        className="min-w-0 flex-[1_1_280px]"
+        autoFocus
+        value={name}
+        onChange={(e) => {
+          setName(e.target.value);
+          setError(undefined);
+          setNote(null);
+        }}
+        onKeyDown={(e) => {
+          // Enter добавляет вариант, а не отправляет всю форму.
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            add();
+          }
+        }}
+        error={error}
+      />
+      {/* Отступ сверху — высота подписи поля: кнопка стоит вровень с полем ввода. */}
+      <Button variant="secondary" className="md:mt-8" onClick={add}>
+        Добавить
+      </Button>
+    </div>
   );
 }
