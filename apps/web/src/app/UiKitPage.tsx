@@ -80,7 +80,7 @@ export function UiKitPage() {
       <Section title="Кнопки">
         <div className="flex flex-wrap gap-3">
           <Button>Записаться</Button>
-          <Button variant="dark">Подать заявку</Button>
+          <Button variant="request">Подать заявку</Button>
           <Button variant="secondary">Подробнее</Button>
           <Button variant="danger">Снять с публикации</Button>
           <Button loading>Отправляем…</Button>
@@ -239,7 +239,7 @@ export function UiKitPage() {
               actions={
                 <>
                   <Button variant="secondary">Подробнее</Button>
-                  <Button variant="dark">Подать заявку</Button>
+                  <Button variant="request">Подать заявку</Button>
                 </>
               }
             >
