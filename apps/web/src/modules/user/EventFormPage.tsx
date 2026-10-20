@@ -280,6 +280,12 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
   const existing = customSlug ? sports.data?.find((sport) => sport.slug === customSlug) : undefined;
   // Новый вид спорта получает иконку по теме названия (участник 2): показываем её сразу.
   const customTheme = customSlug && !existing ? sportTheme(customSlug) : null;
+  // Временная метка на карте — как её увидят после публикации (участник 2): вид спорта,
+  // режим записи и название из формы.
+  const draftSlug =
+    form.sportId === CUSTOM_SPORT
+      ? customSlug || null
+      : (sports.data?.find((sport) => sport.id === form.sportId)?.slug ?? null);
 
   return (
     <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-6">
@@ -427,6 +433,7 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
               value={form.place}
               onChange={choosePlace}
               address={form.address}
+              draft={{ sportSlug: draftSlug, joinMode: form.joinMode, title: form.title }}
               error={errors.venueId ?? errors.lat}
             />
             <TextField

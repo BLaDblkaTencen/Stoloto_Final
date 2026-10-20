@@ -131,7 +131,7 @@ export function AddressField({
 }
 
 function statusText(status: Status, manual: boolean) {
-  if (manual) return 'Точка на карте стоит там, где вы нажали. Адрес — как вы его написали.';
+  if (manual) return 'Метка стоит там, где вы её поставили. Адрес — как вы его написали.';
   switch (status.kind) {
     case 'searching':
       return 'Показываем адрес на карте…';

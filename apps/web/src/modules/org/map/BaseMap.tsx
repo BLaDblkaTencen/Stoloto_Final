@@ -1,10 +1,22 @@
 // Основа всех карт зоны: Leaflet, подложка OpenStreetMap, стиль map-frame и запасное состояние.
 // Файл грузится лениво вместе с Leaflet, поэтому в первый экран сайта карта не попадает.
+//
+// Удобство одинаковое на всех картах: колесо мыши листает страницу, а масштаб меняется колесом
+// с Ctrl (⌘) или жестом на тачпаде — подсказка об этом появляется сама; справа сверху кнопки
+// «Во весь экран» и «Где я».
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AttributionControl, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
-import { MapUnavailable, pinScale } from '../../../shared/ui';
+import {
+  AttributionControl,
+  Circle,
+  MapContainer,
+  Marker,
+  TileLayer,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet';
+import { Icon, MapUnavailable, mePin } from '../../../shared/ui';
 
 /** Центр Красноярска (у Центрального парка) — город демо-данных. */
 export const CITY_CENTER: [number, number] = [56.01, 92.853];
@@ -55,8 +67,6 @@ export function BaseMap({
       zoom={zoom}
       className={`map-frame ${className}`}
       aria-label={label}
-      // Колесо прокрутки двигает страницу, а не карту: иначе страницу с картой трудно пролистать.
-      scrollWheelZoom={false}
       attributionControl={false}
     >
       {/* Без префикса «Leaflet»: его лицензия ссылки не требует. «© OpenStreetMap» обязателен (ODbL). */}
@@ -77,6 +87,8 @@ export function BaseMap({
           },
         }}
       />
+      <WheelGuard />
+      <MapTools />
       {children}
     </MapContainer>
   );
@@ -95,13 +107,177 @@ export function cachedIcon(key: string, make: () => L.DivIconOptions): L.DivIcon
 }
 
 /**
- * Сообщает масштаб меток (pinScale) при открытии карты и после приближения или отдаления.
- * Метки рисует родитель карты, поэтому масштаб уходит наверх в его состояние.
+ * Текущий масштаб карты для частей, которые от него зависят (размер меток, группы).
+ * Меняется после приближения или отдаления, а не на каждом кадре анимации.
  */
-export function PinScaleWatcher({ onChange }: { onChange: (scale: number) => void }) {
+export function useMapZoom() {
   const map = useMap();
-  const report = () => onChange(pinScale(map.getZoom()));
-  useMapEvents({ zoomend: report });
-  useEffect(report, []);
-  return null;
+  const [zoom, setZoom] = useState(() => map.getZoom());
+  useMapEvents({ zoomend: () => setZoom(map.getZoom()) });
+  return zoom;
+}
+
+/**
+ * Подпись метки для экранного диктора — aria-label на её элементе. title не ставим: браузер
+ * показал бы свою подсказку поверх нашей (Tooltip map-tip). Обработчик события add метки.
+ */
+export function ariaLabel(text: string) {
+  return (event: L.LeafletEvent) => {
+    (event.target as L.Marker).getElement()?.setAttribute('aria-label', text);
+  };
+}
+
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
+const HINT_MS = 1500;
+
+/**
+ * Колесо мыши над картой листает страницу, как везде на сайте; масштаб — колесом с Ctrl (⌘),
+ * жест «щипок» на тачпаде браузер присылает так же. Без Ctrl — короткая подсказка поверх карты.
+ * Перехват в фазе погружения: обработчик Leaflet на контейнере такое колесо не видит.
+ */
+function WheelGuard() {
+  const map = useMap();
+  const [hint, setHint] = useState(false);
+  useEffect(() => {
+    const container = map.getContainer();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const onWheel = (event: WheelEvent) => {
+      if (event.ctrlKey || event.metaKey) return;
+      // Попап и кнопки листаются сами: Leaflet туда колесо не пускает.
+      if ((event.target as Element).closest('.leaflet-popup, .leaflet-control, .map-tools')) return;
+      event.stopImmediatePropagation();
+      setHint(true);
+      clearTimeout(timer);
+      timer = setTimeout(() => setHint(false), HINT_MS);
+    };
+    container.addEventListener('wheel', onWheel, { capture: true });
+    return () => {
+      container.removeEventListener('wheel', onWheel, { capture: true });
+      clearTimeout(timer);
+    };
+  }, [map]);
+  return (
+    <div aria-hidden="true" className={`map-hint ${hint ? 'is-visible' : ''}`}>
+      Чтобы изменить масштаб, крутите колесо с зажатым {IS_MAC ? '⌘' : 'Ctrl'}
+    </div>
+  );
+}
+
+/** Дальше этого от центра — «вы не в Красноярске»: встречи пока только там. */
+const CITY_RADIUS_M = 60_000;
+const TOAST_MS = 4000;
+const LOCATE_ZOOM = 15;
+
+/** Кнопки «Во весь экран» и «Где я» справа сверху; точка «вы здесь» после «Где я». */
+function MapTools() {
+  const map = useMap();
+  const tools = useRef<HTMLDivElement>(null);
+  const [full, setFull] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [me, setMe] = useState<{ at: L.LatLng; accuracy: number } | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  const say = (text: string) => {
+    setToast(text);
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS);
+  };
+
+  useEffect(() => {
+    const node = tools.current;
+    // Нажатие на кнопку не должно ставить точку или закрывать попап на карте под ней.
+    if (node) {
+      L.DomEvent.disableClickPropagation(node);
+      L.DomEvent.disableScrollPropagation(node);
+    }
+    const onFullscreen = () => {
+      setFull(document.fullscreenElement === map.getContainer());
+      map.invalidateSize();
+    };
+    document.addEventListener('fullscreenchange', onFullscreen);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreen);
+      clearTimeout(toastTimer.current);
+    };
+  }, [map]);
+
+  useMapEvents({
+    locationfound: (event) => {
+      setLocating(false);
+      setMe({ at: event.latlng, accuracy: event.accuracy });
+      if (map.distance(event.latlng, CITY_CENTER) > CITY_RADIUS_M) {
+        say('Вы не в Красноярске, а встречи пока только там');
+        return;
+      }
+      map.flyTo(event.latlng, Math.max(map.getZoom(), LOCATE_ZOOM), { duration: 0.8 });
+    },
+    locationerror: (event) => {
+      setLocating(false);
+      say(
+        event.code === 1
+          ? 'Браузер не дал узнать, где вы: разрешите доступ к геопозиции'
+          : 'Не получилось определить, где вы',
+      );
+    },
+  });
+
+  const canFullscreen = typeof document !== 'undefined' && document.fullscreenEnabled;
+  const canLocate = typeof navigator !== 'undefined' && 'geolocation' in navigator;
+
+  return (
+    <>
+      <div ref={tools} className="map-tools">
+        {canFullscreen && (
+          <button
+            type="button"
+            className="map-tool"
+            aria-label={full ? 'Свернуть карту' : 'Карта во весь экран'}
+            aria-pressed={full}
+            onClick={() =>
+              full ? void document.exitFullscreen() : void map.getContainer().requestFullscreen()
+            }
+          >
+            <Icon name={full ? 'minimize' : 'maximize'} size={22} />
+          </button>
+        )}
+        {canLocate && (
+          <button
+            type="button"
+            className="map-tool"
+            aria-label="Показать, где я"
+            aria-busy={locating || undefined}
+            onClick={() => {
+              setLocating(true);
+              map.locate({ enableHighAccuracy: true, timeout: 10_000, maximumAge: 60_000 });
+            }}
+          >
+            <Icon name="locate" size={22} />
+          </button>
+        )}
+      </div>
+      {toast && (
+        <div role="status" className="map-toast">
+          {toast}
+        </div>
+      )}
+      {me && me.accuracy < 1500 && (
+        <Circle
+          center={me.at}
+          radius={me.accuracy}
+          interactive={false}
+          pathOptions={{ className: 'map-me-accuracy' }}
+        />
+      )}
+      {me && (
+        <Marker
+          position={me.at}
+          icon={cachedIcon('me', mePin)}
+          interactive={false}
+          keyboard={false}
+          zIndexOffset={-500}
+        />
+      )}
+    </>
+  );
 }

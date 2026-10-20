@@ -14,6 +14,7 @@ import { lazy } from 'react';
 import { Alert, Button, SelectField, VenueCard } from '../../../shared/ui';
 import { useVenues } from './api';
 import { MapBoundary } from './MapBoundary';
+import type { PlaceDraft } from './PickerMap';
 import { venueCardData } from './venueCardData';
 
 export type PlaceValue =
@@ -27,16 +28,26 @@ export type MapPickerProps = {
   sportId?: string;
   value: PlaceValue;
   onChange: (value: PlaceValue) => void;
-  /** Адрес из поля формы: подпись над своей точкой на карте. */
+  /** Адрес из поля формы: подпись над меткой встречи на карте. */
   address?: string;
+  /** Что уже выбрано в форме (вид спорта, режим записи, название): по этому рисуется метка. */
+  draft?: PlaceDraft;
   /** Ошибка поля venueId или координат от сервера. */
   error?: string;
 };
 
 const PickerMap = lazy(() => import('./PickerMap'));
 const MAP_HEIGHT = 'h-[420px] md:h-[520px]';
+const NO_DRAFT: PlaceDraft = { sportSlug: null, joinMode: '', title: '' };
 
-export function MapPicker({ sportId, value, onChange, address = '', error }: MapPickerProps) {
+export function MapPicker({
+  sportId,
+  value,
+  onChange,
+  address = '',
+  draft = NO_DRAFT,
+  error,
+}: MapPickerProps) {
   const venues = useVenues(sportId);
   const items = venues.data ?? [];
   const hasHint = sportId !== undefined && items.some((venue) => venue.suitable === false);
@@ -47,10 +58,11 @@ export function MapPicker({ sportId, value, onChange, address = '', error }: Map
     <div className="flex flex-col gap-4">
       <p className="text-ink-muted">
         {hasHint
-          ? 'Жёлтые метки — площадки, подходящие для этого вида спорта, серые — остальные. '
-          : 'Метки — площадки, где можно договориться о встрече. '}
-        Нажмите на метку, чтобы выбрать площадку, или на свободное место карты, чтобы поставить свою
-        точку (двор, парк). Адрес, который вы вписали выше, появится здесь точкой.
+          ? 'Квадратные метки — площадки: жёлтые подходят этому виду спорта, серые — остальные. '
+          : 'Квадратные метки — площадки, где можно договориться о встрече. '}
+        Нажмите на площадку, чтобы выбрать её, или на свободное место карты, чтобы поставить свою
+        точку. Пунктирная метка — ваша встреча: так её увидят на карте после публикации, свою точку
+        можно перетащить.
       </p>
 
       <MapBoundary className={MAP_HEIGHT}>
@@ -58,6 +70,7 @@ export function MapPicker({ sportId, value, onChange, address = '', error }: Map
           venues={items}
           value={value}
           address={address}
+          draft={draft}
           onPickVenue={pickVenue}
           onPickPoint={(lat, lng) => onChange({ kind: 'point', lat, lng })}
         />

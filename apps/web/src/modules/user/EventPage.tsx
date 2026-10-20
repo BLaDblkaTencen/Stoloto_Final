@@ -110,6 +110,8 @@ function EventView({ event }: { event: EventDetails }) {
                   lng={event.lng}
                   title={event.venue?.name ?? event.address}
                   venueType={event.venue?.type}
+                  sportSlug={event.sport.slug}
+                  joinMode={event.joinMode}
                 />
               </div>
             )}

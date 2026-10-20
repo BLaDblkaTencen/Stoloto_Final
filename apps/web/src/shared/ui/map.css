@@ -33,49 +33,66 @@
 }
 
 /*
+ * Подложка OpenStreetMap спокойнее: цвета приглушены, вода и парки читаются, а цветные метки
+ * и группы на ней видны сразу. Плитки те же — правила OSM и CSP не меняются.
+ */
+.map-frame .leaflet-tile-pane {
+  filter: saturate(0.55) brightness(1.04) contrast(0.92);
+}
+
+/*
  * Метки (pinIcon в map.ts). Позицию задаёт Leaflet, здесь только вид.
- * Без жёсткой тени, как у карточек: на карте тень сдвигает метку зрительно и мешает понять,
- * где точно место. Выбранную выделяет обводка.
+ * Встреча — «капля»: квадрат со скруглёнными углами, кроме одного, повёрнутый на −45°, — острый
+ * угол смотрит вниз, ровно в место встречи. Площадка — скруглённый квадрат по центру места.
+ * Без жёсткой тени: на карте она сдвигает метку зрительно. Выбранную выделяет обводка.
  */
 .pin {
   position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--color-ink);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.pin__body,
+.pin__icon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--pin-size);
+  height: var(--pin-size);
+}
+.pin__body {
   box-sizing: border-box;
+  border: var(--border);
+  background: var(--pin-color);
+}
+.pin--drop .pin__body {
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+}
+.pin--badge .pin__body {
+  border-radius: 30%;
+}
+.pin__icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100%;
-  height: 100%;
-  border: var(--border);
-  border-radius: 50%;
-  color: var(--color-ink);
-  cursor: pointer;
 }
-.pin.is-selected {
+.pin.is-selected .pin__body {
   outline: 3px solid var(--color-ink);
   outline-offset: 2px;
 }
 .pin.is-muted {
-  border-color: var(--color-line-soft);
   color: var(--color-ink-muted);
 }
-
-/* Подпись над своей точкой в форме встречи: вписанный адрес (PickerMap). Без тени, как метки. */
-.map-frame .leaflet-tooltip.map-label {
-  width: max-content;
-  max-width: 260px;
-  padding: 4px 10px;
-  border: var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: none;
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-size: var(--text-base);
-  font-weight: 600;
-  line-height: 1.35;
-  white-space: normal;
+.pin.is-muted .pin__body {
+  border-color: var(--color-line-soft);
 }
-.map-frame .leaflet-tooltip-top.map-label::before {
-  border-top-color: var(--color-ink);
+/* Черновик в форме встречи: так метка будет выглядеть после публикации, пунктир — ещё не она. */
+.pin.is-draft .pin__body {
+  border-style: dashed;
 }
 /*
  * --pin-k — масштаб метки (pinScale в map.ts): вблизи замок меньше вместе с меткой,
@@ -94,14 +111,104 @@
   border-radius: 50%;
   background: var(--color-ink);
 }
-.leaflet-marker-icon:focus-visible .pin,
-.leaflet-marker-icon:focus-visible {
+
+/* Группа встреч (clusterPin): кольцо — цвета видов спорта внутри, в центре — сколько встреч. */
+.map-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: var(--border);
+  border-radius: 50%;
+  background: var(--ring);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.map-cluster__count {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: calc(100% - 14px);
+  height: calc(100% - 14px);
+  border: var(--border);
+  border-radius: 50%;
+  background: var(--color-surface);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Под курсором или в фокусе метка приподнимается, группа — подрастает: видно, на что нажмём. */
+.leaflet-marker-icon:hover .pin,
+.leaflet-marker-icon:focus-visible .pin {
+  transform: translateY(-3px);
+}
+.leaflet-marker-icon:hover .map-cluster,
+.leaflet-marker-icon:focus-visible .map-cluster {
+  transform: scale(1.06);
+}
+/* Фокус с клавиатуры — по форме метки, а не прямоугольником вокруг неё. */
+.map-frame .leaflet-marker-icon:focus-visible {
+  outline: none;
+}
+.leaflet-marker-icon:focus-visible .pin__body,
+.leaflet-marker-icon:focus-visible .map-cluster {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
 }
 /* Выбранная метка поверх соседних. */
 .leaflet-marker-icon:has(.pin.is-selected) {
   z-index: 1000 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pin,
+  .map-cluster {
+    transition: none;
+  }
+}
+
+/*
+ * Подписи над метками, без тени, как метки: map-label — постоянная подпись своей метки в форме
+ * встречи (что за встреча и где), map-tip — подсказка при наведении (название, время, состав группы).
+ */
+.map-frame .leaflet-tooltip.map-label,
+.map-frame .leaflet-tooltip.map-tip {
+  width: max-content;
+  max-width: 260px;
+  padding: 4px 10px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  line-height: 1.35;
+  white-space: normal;
+}
+.map-frame .leaflet-tooltip-top.map-label::before,
+.map-frame .leaflet-tooltip-top.map-tip::before {
+  border-top-color: var(--color-ink);
+}
+.map-tip__title {
+  display: block;
+  font-weight: 700;
+}
+.map-tip__muted {
+  display: block;
+  color: var(--color-ink-muted);
+}
+/* Без мыши подсказка не нужна (нажатие открывает попап), а при открытом попапе — мешает. */
+@media (hover: none) {
+  .map-frame .leaflet-tooltip.map-tip {
+    display: none;
+  }
+}
+.map-frame:has(.leaflet-popup) .leaflet-tooltip.map-tip {
+  display: none;
 }
 
 /* Попап: карточка с обводкой и жёсткой тенью; содержимое — MapPopupCard. */
@@ -156,6 +263,136 @@
   color: var(--color-ink);
   font-size: 24px;
   line-height: 44px;
+}
+
+/* Кнопки карты справа сверху (MapTools в BaseMap): во весь экран и «Где я». Как кнопки масштаба. */
+.map-tools {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.map-tool {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: pointer;
+}
+.map-tool:hover {
+  background: var(--color-surface-muted);
+}
+.map-tool:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.map-tool[aria-busy='true'] svg {
+  animation: map-spin 1s linear infinite;
+}
+
+/* Колесо без Ctrl листает страницу, а не карту: подсказка, как приблизить (WheelGuard). */
+.map-hint {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(0 0 0 / 0.45);
+  color: #fff;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.map-hint.is-visible {
+  opacity: 1;
+}
+
+/* Короткое сообщение внизу карты: «Где я» не сработало или вы не в Красноярске. */
+.map-toast {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 1000;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+/* «Вы здесь» (mePin): точка с расходящимся кольцом и круг точности геопозиции. */
+.map-me {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--color-surface);
+  border-radius: 50%;
+  outline: 2px solid var(--color-ink);
+  background: var(--color-primary);
+}
+.map-me::after {
+  position: absolute;
+  inset: -3px;
+  border: 3px solid var(--color-primary);
+  border-radius: 50%;
+  content: '';
+  animation: map-pulse 1.8s ease-out infinite;
+}
+.map-frame .map-me-accuracy {
+  fill: var(--color-primary);
+  fill-opacity: 0.1;
+  stroke: var(--color-primary);
+  stroke-opacity: 0.5;
+  stroke-width: 1.5;
+}
+
+/* Во весь экран карта без рамки и скруглений. */
+.map-frame:fullscreen {
+  border: 0;
+  border-radius: 0;
+}
+
+@keyframes map-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes map-pulse {
+  from {
+    opacity: 0.8;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-me::after,
+  .map-tool[aria-busy='true'] svg {
+    animation: none;
+  }
 }
 
 /*
