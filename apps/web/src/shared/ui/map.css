@@ -96,11 +96,11 @@
   border-style: dashed;
 }
 /*
- * --pin-k — масштаб метки (pinScale в map.ts): вблизи замок меньше вместе с меткой,
- * но не мельче 3/4 — режим «По заявке» должен читаться и на маленькой метке.
+ * --pin-k — масштаб метки (pinScale в map.ts): вдали и вблизи замок меньше вместе с меткой,
+ * но не мельче 0,6 (LOCK_MIN_SCALE) — режим «По заявке» должен читаться и на маленькой метке.
  */
 .pin__lock {
-  --lock-k: max(var(--pin-k, 1), 0.75);
+  --lock-k: max(var(--pin-k, 1), 0.6);
   position: absolute;
   top: calc(-5px * var(--lock-k));
   right: calc(-5px * var(--lock-k));
@@ -115,7 +115,8 @@
 
 /*
  * Группа (clusterPin): у встреч кольцо — цвета видов спорта внутри, у площадок — жёлтый квадрат;
- * в центре — сколько меток в группе.
+ * в центре — сколько меток в группе. Число — Rubik, а не Unbounded заголовков: широкие цифры
+ * Unbounded налезали на обводку белого круга. Размер группы под число считает clusterPin.
  */
 .map-cluster {
   display: flex;
@@ -144,8 +145,8 @@
   border: var(--border);
   border-radius: 50%;
   background: var(--color-surface);
-  font-family: var(--font-display);
-  font-size: var(--text-base);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
   font-weight: 700;
   line-height: 1;
 }
@@ -236,6 +237,10 @@
 .map-frame .leaflet-popup-tip {
   border: var(--border);
   box-shadow: none;
+}
+/* Нажали на метку издалека: попап уже открыт, но виден, когда карта долетит до метки. */
+.map-frame .leaflet-popup.is-waiting {
+  visibility: hidden;
 }
 /* Закрытие — круглая кнопка 48px на углу карточки: не наезжает на цветную шапку. */
 .map-frame .leaflet-container a.leaflet-popup-close-button,

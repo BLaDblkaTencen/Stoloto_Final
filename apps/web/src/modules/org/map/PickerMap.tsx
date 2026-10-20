@@ -15,7 +15,7 @@ import { ariaLabel, BaseMap, cachedIcon, useMapZoom } from './BaseMap';
 import {
   countOf,
   expandGroup,
-  GROUP_RADIUS,
+  groupRadius,
   GroupMarker,
   groupKey,
   useScreenGroups,
@@ -73,7 +73,7 @@ function PickerMarkers({
   onPickPoint,
 }: PickerMapProps) {
   const map = useMap();
-  // Вблизи метки мельче: не закрывают соседние и точнее стоят на месте (pinScale).
+  // Вдали метки мельче, вблизи тоже: не закрывают соседние и точнее стоят на месте (pinScale).
   const scale = pinScale(useMapZoom());
   const venueId = value?.kind === 'venue' ? value.venue.id : null;
   // Выбранную площадку закрывает метка самой встречи; площадка — в карточке под картой.
@@ -81,7 +81,7 @@ function PickerMarkers({
   const { groups, position } = useScreenGroups(
     venues.filter((venue) => venue.id !== venueId),
     (venue) => [venue.lat, venue.lng],
-    GROUP_RADIUS * scale,
+    groupRadius(scale),
   );
   const at: [number, number] | null =
     value?.kind === 'venue'

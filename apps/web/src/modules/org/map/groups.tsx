@@ -5,14 +5,21 @@ import { groupNearby, type PointGroup } from '@sport/shared/mapClusters';
 import L from 'leaflet';
 import type { ReactNode } from 'react';
 import { Marker, Tooltip, useMap } from 'react-leaflet';
-import { PIN_SIZE } from '../../../shared/ui';
+import { CLUSTER_MIN_SIZE, PIN_SIZE } from '../../../shared/ui';
 import { ariaLabel, useMapZoom } from './BaseMap';
 
 /**
  * Ближе этого на экране (на обзоре города) метки и группы налезают друг на друга: группа
  * крупнее метки, поэтому радиус чуть больше ширины метки (PIN_SIZE).
  */
-export const GROUP_RADIUS = Math.round(PIN_SIZE * 1.13);
+const GROUP_RADIUS = Math.round(PIN_SIZE * 1.13);
+
+/**
+ * Радиус группировки при масштабе меток scale (pinScale): метки мельче — ближе могут стоять.
+ * Но группа не мельче CLUSTER_MIN_SIZE (в ней число), поэтому вдали радиус не меньше её:
+ * иначе соседние группы налезли бы друг на друга.
+ */
+export const groupRadius = (scale: number) => Math.max(GROUP_RADIUS * scale, CLUSTER_MIN_SIZE);
 /**
  * Головка «капли» выше её острого конца на ½ + √2⁄2 − ½ ширины (≈ 0,71 ширины). Группу встреч
  * рисуем там же, где их головки, а не ниже, у концов: иначе соседние капли налезают на неё.
