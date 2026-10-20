@@ -18,11 +18,16 @@ export function AccountMenu() {
     );
   }
 
+  // Шапка в одну строку: на телефоне остаётся «Выйти», с sm — аватар, с md — имя и роль.
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <Avatar name={me.data.name} />
-      <div className="leading-tight">
-        <div className="font-semibold">{me.data.name}</div>
+    <div className="flex items-center gap-3">
+      <span className="inline-flex max-sm:hidden">
+        <Avatar name={me.data.name} />
+      </span>
+      <div className="leading-tight max-md:hidden">
+        <div title={me.data.name} className="max-w-56 truncate font-semibold">
+          {me.data.name}
+        </div>
         <div className="text-sm text-ink-muted">{ROLE_LABELS[me.data.role]}</div>
       </div>
       <Button

@@ -491,7 +491,7 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
           сверху, с заголовком и крупной кнопкой-таблеткой: главное действие формы видно сразу.
           На невысоком экране (ноутбук до 900px) полоса тоньше — без пояснения и с меньшими
           отступами, — иначе она закрывала низ карты места. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-7 gap-y-4 rounded-xl border-2 border-t-[10px] border-ink border-t-accent bg-surface px-5 py-[22px] sm:pr-[26px] sm:pl-8 text-ink shadow-lg lg:sticky lg:bottom-4 lg:z-[1100] lg:[@media(max-height:900px)]:py-3">
+      <div className="flex flex-wrap items-center justify-between gap-x-7 gap-y-4 rounded-xl border-2 border-t-[10px] border-ink border-t-accent bg-surface px-5 py-[22px] sm:pr-[26px] sm:pl-8 text-ink shadow-lg lg:sticky lg:bottom-[calc(var(--tabbar-height,0px)+16px)] lg:z-[1100] lg:[@media(max-height:900px)]:py-3">
         <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1.5">
           <p className="font-display text-[26px] leading-tight font-bold lg:[@media(max-height:900px)]:text-[22px]">
             {event ? 'Готово? Сохраняем' : 'Готово? Публикуем'}
