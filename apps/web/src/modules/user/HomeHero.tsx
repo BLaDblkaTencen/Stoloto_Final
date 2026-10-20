@@ -3,7 +3,6 @@
 // меняется заголовок. Макет: https://claude.ai/artifact/HsM35b8katSxSbGx4qGFfS
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
 import { Icon, sportColor, sportIcon, type IconName } from '../../shared/ui';
 import { Plate, SportSurface, surfaceFor, type SurfaceKind } from './surface/SportSurface';
 
@@ -24,14 +23,12 @@ export function HomeHero({
   sports,
   sportId,
   onSport,
-  canCreate,
   search,
 }: {
-  /** Виды спорта, у которых есть ближайшие встречи. */
+  /** Самые популярные виды спорта с ближайшими встречами (и выбранный, если он не из них). */
   sports: Sport[];
   sportId: string | undefined;
   onSport: (id: string | undefined) => void;
-  canCreate: boolean;
   /** Форма поиска «Чем заняться / Где / Когда». */
   search: ReactNode;
 }) {
@@ -51,26 +48,24 @@ export function HomeHero({
           <Plate className="inline-block -rotate-1">{plate}</Plate>
         </h1>
         {search}
-        <SportBalls sports={sports} sportId={sportId} onSport={onSport} canCreate={canCreate} />
+        <SportBalls sports={sports} sportId={sportId} onSport={onSport} />
       </div>
     </SportSurface>
   );
 }
 
 /**
- * Виды спорта — круглые значки в цвете вида. Выбранный обведён. На телефоне — одна строка
- * с прокруткой вбок, на широком экране — по центру с переносом.
+ * Виды спорта — круглые значки в цвете вида, только самые популярные: остальные находятся
+ * поиском «Чем заняться». Выбранный обведён. На телефоне — одна строка с прокруткой вбок.
  */
 function SportBalls({
   sports,
   sportId,
   onSport,
-  canCreate,
 }: {
   sports: Sport[];
   sportId: string | undefined;
   onSport: (id: string | undefined) => void;
-  canCreate: boolean;
 }) {
   return (
     <div
@@ -95,18 +90,6 @@ function SportBalls({
           onClick={() => onSport(sport.id === sportId ? undefined : sport.id)}
         />
       ))}
-      {canCreate && (
-        <Link
-          to="/events/new?sport=custom"
-          aria-label="Своё направление: создать встречу с новым видом спорта"
-          className={`${BALL_CLASS} no-underline hover:text-ink hover:no-underline`}
-        >
-          <span className={`${CIRCLE_CLASS} border-dashed bg-surface`}>
-            <Icon name="plus" size={24} />
-          </span>
-          <BallLabel>Своё</BallLabel>
-        </Link>
-      )}
     </div>
   );
 }

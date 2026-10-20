@@ -1,6 +1,6 @@
 // Главная (задачи 1.4, 1.10), вариант Б2 + К1 после экспертной сессии: площадка под выбранный
 // вид спорта с поиском, ниже лента по дням рядом с картой. Режим записи и уровень — в «Фильтрах»,
-// «Мои записи» — одна ближайшая строкой, «Как это работает» — тонкой полосой внизу.
+// «Мои записи» — одна ближайшая строкой. Гостю внизу — «Как это работает» и «Клуб или сообщество?».
 // Фильтры живут в адресе страницы: ссылкой на подборку можно поделиться, «Назад» возвращает фильтр.
 import { EVENT_LEVEL_LABELS, EVENT_LEVELS, JOIN_MODE_LABELS, JOIN_MODES } from '@sport/shared';
 import type { EventListItem } from '@sport/shared/schemas/events';
@@ -125,15 +125,22 @@ export function FeedPage() {
     );
   };
 
-  const sports = useSports({ withEvents: true });
+  // Значки — шесть самых популярных видов. Выбранный по ссылке вид вне шестёрки (из интересов
+  // в профиле) добавляем к ним, иначе фильтр работал бы, а значка у него не было.
+  const top = useSports({ top: 6 });
+  const withEvents = useSports({ withEvents: true });
+  const selected = withEvents.data?.find((sport) => sport.id === params.sportId);
+  const sports = [
+    ...(top.data ?? []),
+    ...(selected && !top.data?.some((sport) => sport.id === selected.id) ? [selected] : []),
+  ];
 
   return (
     <div className="flex flex-col gap-8">
       <HomeHero
-        sports={sports.data ?? []}
+        sports={sports}
         sportId={params.sportId}
         onSport={(id) => setParams({ sport: id })}
-        canCreate={me.data?.role !== 'admin'}
         search={
           <SearchForm
             key={`${params.q ?? ''}|${params.place ?? ''}`}
@@ -156,7 +163,8 @@ export function FeedPage() {
         onParam={(key, value) => setParams({ [key]: value })}
       />
 
-      <HowItWorks />
+      <Steps />
+      <OrgInvite />
     </div>
   );
 }
@@ -692,40 +700,74 @@ function FeedAction({ event }: { event: EventListItem }) {
 }
 
 const STEPS = [
-  { color: 'var(--sport-1)', title: 'Выберите занятие' },
-  { color: 'var(--sport-3)', title: 'Найдите встречу на карте' },
-  { color: 'var(--sport-2)', title: 'Присоединяйтесь сразу или по заявке' },
+  {
+    color: 'var(--sport-1)',
+    title: 'Выберите занятие',
+    text: 'Из списка или своё — даже самое редкое.',
+  },
+  {
+    color: 'var(--sport-3)',
+    title: 'Найдите на карте',
+    text: 'Встречи рядом, условия и организатор — в одном окне.',
+  },
+  {
+    color: 'var(--sport-2)',
+    title: 'Присоединяйтесь',
+    text: 'Сразу или по заявке — статус всегда в «Моих мероприятиях».',
+  },
 ];
 
-/** Тонкая полоса внизу: три шага для гостя и ссылка для клубов. Вошедшему участнику не нужна. */
-function HowItWorks() {
+/**
+ * «Как это работает»: отдельный раздел — двойной отступ от карты и видимый заголовок.
+ * Только гостю: кто вошёл, уже знает, как пользоваться.
+ */
+function Steps() {
   const me = useMe();
-  const role = me.data?.role;
-  if (me.isPending || role === 'user' || role === 'admin') return null;
+  const headingId = useId();
+  if (me.isPending || me.data) return null;
   return (
-    <section
-      aria-label="Как это работает"
-      className="mb-6 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-lg border-2 border-ink bg-surface px-5 py-4"
-    >
-      {!role && (
-        <ol className="flex flex-wrap gap-x-6 gap-y-2">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="flex items-center gap-2.5 font-semibold">
-              <span
-                aria-hidden="true"
-                className="inline-flex size-9 items-center justify-center rounded-full border-2 border-ink font-display text-base"
-                style={{ background: step.color }}
-              >
-                {index + 1}
-              </span>
-              {step.title}
-            </li>
-          ))}
-        </ol>
-      )}
-      <Link to={role ? '/org' : '/register'} className="font-semibold">
-        {role ? 'Кабинет организации →' : 'Клуб или сообщество? Заведите страницу →'}
-      </Link>
+    <section aria-labelledby={headingId} className="mt-8 flex flex-col gap-5">
+      <h2 id={headingId} className="text-h2">
+        Как это работает
+      </h2>
+      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+        {STEPS.map((step, index) => (
+          <div
+            key={step.title}
+            className="flex flex-col gap-2 rounded-lg border-2 border-ink bg-surface p-6"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-flex size-12 items-center justify-center rounded-full border-2 border-ink font-display text-[22px] font-bold"
+              style={{ background: step.color }}
+            >
+              {index + 1}
+            </span>
+            <h3 className="text-h3">{step.title}</h3>
+            <p className="text-ink-muted">{step.text}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** «Клуб или сообщество?» — только гостю: регистрация организации. */
+function OrgInvite() {
+  const me = useMe();
+  if (me.isPending || me.data) return null;
+  return (
+    <section className="mb-6 flex flex-wrap items-center justify-between gap-6 rounded-xl border-2 border-ink bg-status-request p-6 shadow-lg md:p-9">
+      <div className="min-w-0 flex-[1_1_440px]">
+        <h2 className="text-h2 mb-2">Клуб или сообщество?</h2>
+        <p className="text-lg">
+          Заведите страницу организации. После одобрения администратором ваши встречи сразу появятся
+          на карте.
+        </p>
+      </div>
+      <ButtonLink to="/register" variant="secondary" size="lg">
+        Подать заявку
+      </ButtonLink>
     </section>
   );
 }

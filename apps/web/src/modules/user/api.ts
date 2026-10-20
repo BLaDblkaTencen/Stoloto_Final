@@ -57,12 +57,12 @@ function toQuery(params: Record<string, string | number | undefined>) {
   return text ? `?${text}` : '';
 }
 
-export function useSports(options: { withEvents?: boolean } = {}) {
+export function useSports(options: { withEvents?: boolean; top?: number } = {}) {
   return useQuery({
     queryKey: ['sports', options],
     queryFn: () =>
       api<{ items: Sport[] }>(
-        `/sports${toQuery({ withEvents: options.withEvents ? 'true' : undefined })}`,
+        `/sports${toQuery({ withEvents: options.withEvents ? 'true' : undefined, top: options.top })}`,
       ),
     select: (data) => data.items,
     staleTime: 60_000,

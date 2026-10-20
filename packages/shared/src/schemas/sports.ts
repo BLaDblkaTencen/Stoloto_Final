@@ -36,6 +36,8 @@ export const sportsQuerySchema = z.object({
   q: z.string().trim().max(SPORT_NAME_MAX).optional(),
   /** Только виды спорта, у которых есть предстоящие опубликованные события (чипы ленты). */
   withEvents: z.stringbool().optional(),
+  /** Самые популярные: N видов с наибольшим числом предстоящих встреч (значки на главной). */
+  top: z.coerce.number().int().min(1).max(20).optional(),
 });
 
 export type SportsQuery = z.infer<typeof sportsQuerySchema>;
