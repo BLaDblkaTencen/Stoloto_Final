@@ -15,10 +15,27 @@ import { sportNameSchema, type Sport } from './sports';
 import type { AttendanceState, OrganizerSummary } from './reviews';
 
 /**
- * Часовой пояс, в котором показываем время и считаем границы дня в фильтре по дате.
- * Не пояс браузера: эксперт из Москвы должен видеть то же время встречи, что и организатор.
+ * Пояс города демо-данных. Интерфейс показывает время в поясе устройства и присылает его
+ * в фильтр по дате (`tz`); этот пояс — границы дня, если `tz` не передан, и время в сиде.
  */
 export const EVENT_TIMEZONE = 'Asia/Krasnoyarsk';
+
+/**
+ * Пояс IANA вида «Europe/Moscow» или «UTC», который знает и браузер, и Postgres. Смещения
+ * вида «+03:00» не принимаем: Postgres читает их со знаком наоборот (по POSIX).
+ */
+export const timeZoneSchema = z
+  .string()
+  .max(64)
+  .regex(/^[A-Za-z][A-Za-z0-9_+-]*(\/[A-Za-z0-9_+-]+)*$/, 'Неизвестный часовой пояс')
+  .refine((value) => {
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: value });
+      return true;
+    } catch {
+      return false;
+    }
+  }, 'Неизвестный часовой пояс');
 
 /** Лимиты текстовых полей, общие для формы и сервера. */
 export const EVENT_LIMITS = {
@@ -211,6 +228,8 @@ export const eventListQuerySchema = z
     date: day.optional(),
     dateFrom: day.optional(),
     dateTo: day.optional(),
+    /** Пояс, в котором считаются границы дня для date, dateFrom и dateTo: пояс устройства человека. */
+    tz: timeZoneSchema.default(EVENT_TIMEZONE),
     joinMode: z.enum(JOIN_MODES).optional(),
     level: z.enum(EVENT_LEVELS).optional(),
     bbox: bbox.optional(),

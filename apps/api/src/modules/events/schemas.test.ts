@@ -95,6 +95,15 @@ describe('фильтры ленты', () => {
     expect(query.sportId).toHaveLength(2);
   });
 
+  it('пояс для границ дня: по умолчанию Красноярск, смещения и выдуманные пояса — ошибка', () => {
+    expect(eventListQuerySchema.parse({}).tz).toBe('Asia/Krasnoyarsk');
+    expect(eventListQuerySchema.parse({ tz: 'Europe/Moscow' }).tz).toBe('Europe/Moscow');
+    expect(eventListQuerySchema.parse({ tz: 'UTC' }).tz).toBe('UTC');
+    expect(eventListQuerySchema.safeParse({ tz: '+03:00' }).success).toBe(false);
+    expect(eventListQuerySchema.safeParse({ tz: 'Mars/Olympus' }).success).toBe(false);
+    expect(eventListQuerySchema.safeParse({ tz: "x'; drop table events;--" }).success).toBe(false);
+  });
+
   it('«Где»: обрезается по краям, длинный запрос — ошибка', () => {
     expect(eventListQuerySchema.parse({ place: '  Весны ' }).place).toBe('Весны');
     expect(eventListQuerySchema.safeParse({ place: 'а'.repeat(101) }).success).toBe(false);
