@@ -1,4 +1,5 @@
-// Поиск места по адресу для формы встречи: вписанный адрес → точка на карте. Владелец: участник 2.
+// Поиск места для формы встречи: вписанный адрес → точка на карте, точка на карте → её адрес.
+// Владелец: участник 2.
 // Контракт — docs/api/organizations.md, раздел «Поиск адреса». Сервер ходит в OpenStreetMap
 // Nominatim сам: браузеру внешние запросы запрещает политика безопасности сайта (CSP).
 import { z } from 'zod';
@@ -22,3 +23,12 @@ export type GeocodePlace = {
 
 /** GET /api/geocode — до пяти мест, лучшее первым; пустой список — адрес не нашли. */
 export type GeocodeResponse = { items: GeocodePlace[] };
+
+/** Точка, которую отметили на карте, — для GET /api/geocode/reverse. */
+export const reverseGeocodeQuery = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+});
+
+/** GET /api/geocode/reverse — адрес точки; place: null — рядом нет ни дома, ни улицы. */
+export type ReverseGeocodeResponse = { place: GeocodePlace | null };

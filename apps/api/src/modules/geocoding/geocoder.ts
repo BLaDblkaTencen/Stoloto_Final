@@ -1,4 +1,5 @@
-// Поиск адреса для «Места встречи»: вписанный адрес → точка на карте. Владелец: участник 2.
+// Поиск адреса для «Места встречи»: вписанный адрес → точка на карте, точка на карте → её адрес.
+// Владелец: участник 2.
 // Источник — OpenStreetMap Nominatim. По его правилам (operations.osmfoundation.org/policies/nominatim)
 // не чаще запроса в секунду, с понятным User-Agent и без подсказок на каждую букву: поэтому
 // запросы идут по одному в очереди, ответы кэшируются, а форма ищет после паузы в наборе или по Enter.
@@ -120,6 +121,33 @@ export function toPlace(found: NominatimPlace): GeocodePlace {
 }
 
 /**
+ * Адрес точки, которую отметили на карте, для поля формы. Ответ reverse с layer=address — это
+ * ближайшее здание или улица: дом — «улица Авиаторов, 21»; дом без улицы — «остров Татышев, 3Г»;
+ * только улица — её название. Без улицы и дома (середина парка, река) — null: «Центральный район»
+ * адресом не назовёшь, человек впишет место сам.
+ */
+export function addressOf(found: NominatimPlace, lat: number, lng: number): GeocodePlace | null {
+  const address = found.address ?? {};
+  const street = address.road ?? address.pedestrian ?? address.footway ?? address.square;
+  const house = address.house_number;
+  const area = address.neighbourhood ?? address.quarter;
+  const label = street
+    ? house
+      ? `${street}, ${house}`
+      : street
+    : house && area
+      ? `${area}, ${house}`
+      : null;
+  if (!label) return null;
+  return {
+    label,
+    context: address.suburb ?? address.city_district ?? null,
+    lat,
+    lng,
+  };
+}
+
+/**
  * Одно и то же место дважды (площадь и остановка «Площадь Революции», остров и «остров» рядом):
  * та же подпись без учёта регистра в пределах километра — оставляем первое.
  */
@@ -217,6 +245,20 @@ export function createGeocoder({
         if (found.length > 0) return uniquePlaces(found.map(toPlace));
       }
       return [];
+    },
+
+    /**
+     * Адрес точки на карте; null — рядом нет ни дома, ни улицы. Координаты в ответе — та же
+     * точка, а не найденное здание: метка остаётся там, где её поставили.
+     */
+    async reverse(lat: number, lng: number): Promise<GeocodePlace | null> {
+      const found = await request<NominatimPlace | { error: string }>('/reverse', {
+        lat: String(lat),
+        lon: String(lng),
+        zoom: '18',
+        layer: 'address',
+      });
+      return 'error' in found ? null : addressOf(found, lat, lng);
     },
   };
 }

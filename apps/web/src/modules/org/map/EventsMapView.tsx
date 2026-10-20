@@ -1,15 +1,17 @@
 // Карта встреч (задача 2.10): события в видимой области, метки по виду спорта, попап с кнопкой.
 // Ленивая часть EventsMap: всё, что требует Leaflet.
 //
-// Метки «умные»: встречи, которые на этом масштабе налезли бы друг на друга, собираются в группу
-// с числом и кольцом из цветов их видов спорта. Нажатие на группу приближает карту к ней,
-// а если встречи в одном месте — показывает их списком. Наведение — название и время встречи.
+// Метки «умные»: что на этом масштабе налезло бы друг на друга, собирается в группу с числом.
+// Встречи — круг с кольцом из цветов их видов спорта, площадки — жёлтый квадрат; со слоем
+// площадок встречи и площадки группируются вместе, чтобы группы не закрывали друг друга.
+// Нажатие на группу приближает карту к ней, а всё, что в одном месте, показывает списком.
+// Наведение — название и время встречи. Метка с открытым попапом и выбранная встреча в группы
+// не уходят.
 import { EVENT_TIMEZONE, type EventMapItem } from '@sport/shared/schemas/events';
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { Bbox, Venue } from '@sport/shared/schemas/venues';
-import { groupNearby, type PointGroup } from '@sport/shared/mapClusters';
-import L from 'leaflet';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import type L from 'leaflet';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Marker, Popup, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { Link } from 'react-router';
 import {
@@ -24,6 +26,15 @@ import {
   venuePin,
 } from '../../../shared/ui';
 import { ariaLabel, BaseMap, cachedIcon, useMapZoom } from './BaseMap';
+import {
+  countOf,
+  expandGroup,
+  GROUP_RADIUS,
+  GroupMarker,
+  groupKey,
+  HEAD_OFFSET,
+  useScreenGroups,
+} from './groups';
 import { venueCardData } from './venueCardData';
 
 export type EventsMapViewProps = {
@@ -55,15 +66,8 @@ const dateFormat = new Intl.DateTimeFormat('ru', {
   minute: '2-digit',
 });
 const when = (event: EventMapItem) => dateFormat.format(new Date(event.startsAt));
-
-/** «1 встреча», «3 встречи», «12 встреч». */
-function meetings(n: number) {
-  const mod10 = n % 10;
-  const mod100 = n % 100;
-  if (mod10 === 1 && mod100 !== 11) return `${n} встреча`;
-  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${n} встречи`;
-  return `${n} встреч`;
-}
+const meetings = (n: number) => countOf(n, ['встреча', 'встречи', 'встреч']);
+const places = (n: number) => countOf(n, ['площадка', 'площадки', 'площадок']);
 
 export function EventsMapView({
   events,
@@ -91,9 +95,11 @@ export function EventsMapView({
     <BaseMap label="Карта встреч" className={className}>
       <BoundsWatcher onChange={onBoundsChange} />
       <FocusWatcher focus={focus} markers={markers.current} events={events} />
-      <VenueMarkers venues={venues} atVenue={atVenue} createHref={createHref} />
-      <EventMarkers
+      <Markers
         events={ownPoints}
+        venues={venues}
+        atVenue={atVenue}
+        createHref={createHref}
         sportsById={sportsById}
         selectedId={selectedId}
         onSelect={onSelect}
@@ -103,98 +109,34 @@ export function EventsMapView({
   );
 }
 
-function VenueMarkers({
-  venues,
-  atVenue,
-  createHref,
-}: {
-  venues: Venue[];
-  atVenue: Map<string, EventMapItem[]>;
-  createHref: ((venue: Venue) => string) | null;
-}) {
-  // Вблизи метки мельче: не закрывают соседние и точнее стоят на месте (pinScale).
-  const scale = pinScale(useMapZoom());
-  return venues.map((venue) => {
-    const suitable = venue.suitable ?? true;
-    const here = atVenue.get(venue.id) ?? [];
-    // У площадки со встречами метка крупнее: видно, где уже собираются.
-    const busy = here.length > 0;
-    const label = busy ? `${venue.name}: ${meetings(here.length)}` : venue.name;
-    return (
-      <Marker
-        key={`venue:${venue.id}`}
-        position={[venue.lat, venue.lng]}
-        zIndexOffset={busy ? 500 : suitable ? 100 : 0}
-        eventHandlers={{ add: ariaLabel(label) }}
-        icon={cachedIcon(`venue:${venue.type}:${suitable}:${busy}:${scale}`, () =>
-          venuePin({ type: venue.type, suitable, selected: busy, scale }),
-        )}
-      >
-        <Tooltip direction="top" className="map-tip" opacity={1}>
-          <span className="map-tip__title">{venue.name}</span>
-          {busy && <span className="map-tip__muted">Здесь {meetings(here.length)}</span>}
-        </Tooltip>
-        {/* maxHeight: попап выше карты Leaflet сдвигает её при каждой перерисовке без конца. */}
-        <Popup minWidth={300} maxWidth={320} maxHeight={380}>
-          <div className="bg-surface text-ink">
-            <VenueCard venue={venueCardData(venue)} compact />
-            <div className="flex flex-col gap-2 px-3.5 pb-3.5">
-              {here.length > 0 && (
-                <div className="flex flex-col gap-1">
-                  <div className="font-semibold">Встречи здесь</div>
-                  {here.map((event) => (
-                    <PopupLink key={event.id} to={`/events/${event.id}`}>
-                      {event.title}
-                      <span className="block text-sm text-ink-muted">{when(event)}</span>
-                    </PopupLink>
-                  ))}
-                </div>
-              )}
-              {createHref && (
-                <PopupLink to={createHref(venue)} button>
-                  Создать встречу здесь
-                </PopupLink>
-              )}
-            </div>
-          </div>
-        </Popup>
-      </Marker>
-    );
-  });
-}
-
-/**
- * Ближе этого на экране (на обзоре города) метки и группы налезают друг на друга: группа (48–60px)
- * крупнее метки (46px), поэтому радиус чуть больше ширины метки.
- */
-const GROUP_RADIUS = 52;
-/**
- * Головка «капли» выше её острого конца на ½ + √2⁄2 − ½ ширины ≈ 32px. Группу рисуем там же,
- * где головки её встреч, а не ниже, у их концов: иначе соседние капли налезают на неё сверху.
- */
-const HEAD_OFFSET = 46 * Math.SQRT1_2;
-/** Встречи ближе этого — «в одном месте»: приближать бесполезно, показываем списком. */
-const SAME_PLACE_M = 40;
-/** С этого масштаба группа не приближает, а показывает список: дальше дома и подъезды. */
-const LIST_ZOOM = 17;
-
 type Placed = EventMapItem & { lat: number; lng: number };
 const placed = (event: EventMapItem): event is Placed => event.lat !== null && event.lng !== null;
 
+/** Метка на карте: встреча или площадка. id с приставкой — у встречи и площадки не совпадут. */
+type Item =
+  | { kind: 'event'; id: string; lat: number; lng: number; event: Placed }
+  | { kind: 'venue'; id: string; lat: number; lng: number; venue: Venue };
+
 /**
- * Метки встреч с группировкой. Выбранная встреча в группы не попадает: «На карте» в ленте и
- * нажатие на метку должны показать именно её. Все метки — в одном массиве с ключом по id:
- * когда встреча становится выбранной, React двигает её метку, а не пересоздаёт (иначе её
- * открытый попап закрылся бы, а исчезнувшая с открытым попапом метка зацикливает react-leaflet).
+ * Все метки карты с группировкой. Выбранная встреча («На карте» в ленте, нажатие на метку) и
+ * метка с открытым попапом в группы не попадают: должны остаться видны именно они. Все метки —
+ * в одном массиве с ключом по id: React двигает метку, а не пересоздаёт (иначе открытый попап
+ * закрылся бы, а исчезнувшая с открытым попапом метка зацикливает react-leaflet).
  */
-function EventMarkers({
+function Markers({
   events,
+  venues,
+  atVenue,
+  createHref,
   sportsById,
   selectedId,
   onSelect,
   markers,
 }: {
   events: EventMapItem[];
+  venues: Venue[];
+  atVenue: Map<string, EventMapItem[]>;
+  createHref: ((venue: Venue) => string) | null;
   sportsById: Map<string, Sport>;
   selectedId?: string;
   onSelect?: (id: string) => void;
@@ -202,65 +144,121 @@ function EventMarkers({
 }) {
   const map = useMap();
   const zoom = useMapZoom();
+  // Вблизи метки мельче: не закрывают соседние и точнее стоят на месте (pinScale).
   const scale = pinScale(zoom);
-  const [list, setList] = useState<{ key: string; at: L.LatLng; items: Placed[] } | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [list, setList] = useState<{ key: string; at: L.LatLng; items: Item[] } | null>(null);
   // Другой масштаб — другие группы: список старой группы закрываем.
   useEffect(() => setList(null), [zoom]);
 
-  const visible = useMemo(
-    () => events.filter(placed).sort((a, b) => a.id.localeCompare(b.id)),
-    [events],
-  );
-  const groups = useMemo(() => {
-    const points = visible
-      .filter((event) => event.id !== selectedId)
-      .map((event) => {
-        const { x, y } = map.project([event.lat, event.lng], zoom);
-        return { x, y, item: event };
-      });
-    return groupNearby(points, GROUP_RADIUS * scale);
-  }, [visible, selectedId, map, zoom, scale]);
-  const selected = visible.find((event) => event.id === selectedId);
-  const headAt = (group: PointGroup<Placed>) =>
-    map.unproject([group.x, group.y - HEAD_OFFSET * scale], zoom);
-
-  const single = (event: Placed, isSelected: boolean) => (
-    <EventMarker
-      key={event.id}
-      event={event}
-      sport={sportsById.get(event.sportId)}
-      selected={isSelected}
-      scale={scale}
-      onSelect={onSelect}
-      markers={markers}
-    />
+  const items: Item[] = [
+    ...events.filter(placed).map((event): Item => ({
+      kind: 'event',
+      id: `e:${event.id}`,
+      lat: event.lat,
+      lng: event.lng,
+      event,
+    })),
+    ...venues.map((venue): Item => ({
+      kind: 'venue',
+      id: `v:${venue.id}`,
+      lat: venue.lat,
+      lng: venue.lng,
+      venue,
+    })),
+  ];
+  const pinned = (item: Item) =>
+    item.id === openId || (item.kind === 'event' && item.event.id === selectedId);
+  const { groups, position } = useScreenGroups(
+    items.filter((item) => !pinned(item)),
+    (item) => [item.lat, item.lng],
+    GROUP_RADIUS * scale,
   );
 
-  const open = (group: PointGroup<Placed>, key: string) => {
-    const bounds = L.latLngBounds(group.items.map((event) => [event.lat, event.lng]));
-    const spread = map.distance(bounds.getSouthWest(), bounds.getNorthEast());
-    if (spread < SAME_PLACE_M || map.getZoom() >= LIST_ZOOM) {
-      setList({ key, at: headAt(group), items: group.items });
-    } else {
-      map.flyToBounds(bounds, { padding: [80, 80], maxZoom: LIST_ZOOM, duration: 0.6 });
-    }
-  };
+  const opened = (id: string) => ({
+    onOpen: () => setOpenId(id),
+    onClose: () => setOpenId((current) => (current === id ? null : current)),
+  });
+  const single = (item: Item) =>
+    item.kind === 'event' ? (
+      <EventMarker
+        key={item.id}
+        event={item.event}
+        sport={sportsById.get(item.event.sportId)}
+        selected={item.event.id === selectedId}
+        scale={scale}
+        onSelect={onSelect}
+        markers={markers}
+        {...opened(item.id)}
+      />
+    ) : (
+      <VenueMarker
+        key={item.id}
+        venue={item.venue}
+        here={atVenue.get(item.venue.id) ?? []}
+        createHref={createHref}
+        scale={scale}
+        {...opened(item.id)}
+      />
+    );
 
   const nodes = groups.map((group) => {
-    if (group.items.length === 1) return single(group.items[0], false);
-    const key = `group:${group.items.map((event) => event.id).join('+')}`;
+    if (group.items.length === 1) return single(group.items[0]);
+    const key = groupKey('group', group);
+    const groupEvents = group.items.flatMap((item) => (item.kind === 'event' ? [item.event] : []));
+    const groupVenues = group.items.flatMap((item) => (item.kind === 'venue' ? [item.venue] : []));
+    const sports = groupEvents.map((event) => sportsById.get(event.sportId));
+    const colors = [
+      ...new Set(sports.map((sport) => sportColor(sport?.slug ?? ''))),
+      ...(groupVenues.length ? ['var(--color-accent)'] : []),
+    ];
+    const what = [
+      groupEvents.length ? meetings(groupEvents.length) : '',
+      groupVenues.length ? places(groupVenues.length) : '',
+    ]
+      .filter(Boolean)
+      .join(' и ');
+    const names = [
+      ...new Set([
+        ...sports.map((sport) => sport?.name ?? 'Спорт'),
+        ...groupVenues.map((venue) => venue.name),
+      ]),
+    ];
+    // Головки «капель» выше их точек: группа встреч — там же; у площадок метка по центру точки.
+    const at = position(group, (HEAD_OFFSET * scale * groupEvents.length) / group.items.length);
+    const onlyVenues = groupEvents.length === 0;
     return (
       <GroupMarker
         key={key}
-        group={group}
-        at={headAt(group)}
-        sportsById={sportsById}
-        scale={scale}
-        onOpen={() => open(group, key)}
-      />
+        at={at}
+        icon={cachedIcon(
+          `group:${group.items.length}:${colors.join(',')}:${onlyVenues}:${scale}`,
+          () =>
+            clusterPin({
+              count: group.items.length,
+              colors,
+              shape: onlyVenues ? 'square' : 'circle',
+              scale,
+            }),
+        )}
+        label={`${what} рядом: ${names.join(', ')}`}
+        onClick={() =>
+          expandGroup(
+            map,
+            group.items.map((item) => [item.lat, item.lng]),
+            () => setList({ key, at, items: group.items }),
+          )
+        }
+      >
+        <span className="map-tip__title">{what} рядом</span>
+        <span className="map-tip__muted">
+          {names.slice(0, 4).join(', ')}
+          {names.length > 4 && '…'}
+        </span>
+      </GroupMarker>
     );
   });
-  if (selected) nodes.push(single(selected, true));
+  for (const item of items.filter(pinned)) nodes.push(single(item));
 
   return (
     <>
@@ -274,21 +272,105 @@ function EventMarkers({
           maxHeight={320}
           eventHandlers={{ remove: () => setList(null) }}
         >
-          <div className="flex flex-col gap-2 bg-surface p-3.5 text-ink">
-            <div className="font-semibold">В одном месте {meetings(list.items.length)}</div>
-            {list.items.map((event) => (
-              <PopupLink key={event.id} to={`/events/${event.id}`}>
-                {event.title}
-                <span className="block text-sm text-ink-muted">
-                  {when(event)}
-                  {event.joinMode === 'request' && ' · по заявке'}
-                </span>
-              </PopupLink>
-            ))}
-          </div>
+          <SamePlaceList items={list.items} createHref={createHref} />
         </Popup>
       )}
     </>
+  );
+}
+
+/** Всё, что стоит в одном месте: встречи — ссылками, площадки — с «Создать встречу здесь». */
+function SamePlaceList({
+  items,
+  createHref,
+}: {
+  items: Item[];
+  createHref: ((venue: Venue) => string) | null;
+}) {
+  const count = items.filter((item) => item.kind === 'event').length;
+  return (
+    <div className="flex flex-col gap-2 bg-surface p-3.5 text-ink">
+      <div className="font-semibold">
+        {count ? `В одном месте ${meetings(count)}` : `В одном месте ${places(items.length)}`}
+      </div>
+      {items.map((item) =>
+        item.kind === 'event' ? (
+          <PopupLink key={item.id} to={`/events/${item.event.id}`}>
+            {item.event.title}
+            <span className="block text-sm text-ink-muted">
+              {when(item.event)}
+              {item.event.joinMode === 'request' && ' · по заявке'}
+            </span>
+          </PopupLink>
+        ) : (
+          <div key={item.id} className="flex flex-col gap-1">
+            <span className="leading-snug">{item.venue.name}</span>
+            <span className="text-sm text-ink-muted">{item.venue.address}</span>
+            {createHref && <PopupLink to={createHref(item.venue)}>Создать встречу здесь</PopupLink>}
+          </div>
+        ),
+      )}
+    </div>
+  );
+}
+
+function VenueMarker({
+  venue,
+  here,
+  createHref,
+  scale,
+  onOpen,
+  onClose,
+}: {
+  venue: Venue;
+  here: EventMapItem[];
+  createHref: ((venue: Venue) => string) | null;
+  scale: number;
+  onOpen: () => void;
+  onClose: () => void;
+}) {
+  const suitable = venue.suitable ?? true;
+  // Где уже есть встречи — обводка: видно, где собираются, а соседей метка не закрывает.
+  const busy = here.length > 0;
+  const label = busy ? `${venue.name}: ${meetings(here.length)}` : venue.name;
+  return (
+    <Marker
+      position={[venue.lat, venue.lng]}
+      zIndexOffset={busy ? 500 : suitable ? 100 : 0}
+      eventHandlers={{ add: ariaLabel(label), popupopen: onOpen, popupclose: onClose }}
+      icon={cachedIcon(`venue:${venue.type}:${suitable}:busy-${busy}:${scale}`, () =>
+        venuePin({ type: venue.type, suitable, busy, scale }),
+      )}
+    >
+      <Tooltip direction="top" className="map-tip" opacity={1}>
+        <span className="map-tip__title">{venue.name}</span>
+        {busy && <span className="map-tip__muted">Здесь {meetings(here.length)}</span>}
+      </Tooltip>
+      {/* maxHeight: попап выше карты Leaflet сдвигает её при каждой перерисовке без конца. */}
+      <Popup minWidth={300} maxWidth={320} maxHeight={380}>
+        <div className="bg-surface text-ink">
+          <VenueCard venue={venueCardData(venue)} compact />
+          <div className="flex flex-col gap-2 px-3.5 pb-3.5">
+            {here.length > 0 && (
+              <div className="flex flex-col gap-1">
+                <div className="font-semibold">Встречи здесь</div>
+                {here.map((event) => (
+                  <PopupLink key={event.id} to={`/events/${event.id}`}>
+                    {event.title}
+                    <span className="block text-sm text-ink-muted">{when(event)}</span>
+                  </PopupLink>
+                ))}
+              </div>
+            )}
+            {createHref && (
+              <PopupLink to={createHref(venue)} button>
+                Создать встречу здесь
+              </PopupLink>
+            )}
+          </div>
+        </div>
+      </Popup>
+    </Marker>
   );
 }
 
@@ -298,6 +380,8 @@ function EventMarker({
   selected,
   scale,
   onSelect,
+  onOpen,
+  onClose,
   markers,
 }: {
   event: Placed;
@@ -305,6 +389,8 @@ function EventMarker({
   selected: boolean;
   scale: number;
   onSelect?: (id: string) => void;
+  onOpen: () => void;
+  onClose: () => void;
   markers: Map<string, L.Marker>;
 }) {
   const slug = sport?.slug ?? '';
@@ -317,6 +403,8 @@ function EventMarker({
       }}
       eventHandlers={{
         add: ariaLabel(label),
+        popupopen: onOpen,
+        popupclose: onClose,
         ...(onSelect && { click: () => onSelect(event.id) }),
       }}
       position={[event.lat, event.lng]}
@@ -336,47 +424,8 @@ function EventMarker({
   );
 }
 
-/** Группа встреч: круг с числом, кольцо — цвета их видов спорта; подсказка — что внутри. */
-function GroupMarker({
-  group,
-  at,
-  sportsById,
-  scale,
-  onOpen,
-}: {
-  group: PointGroup<Placed>;
-  at: L.LatLng;
-  sportsById: Map<string, Sport>;
-  scale: number;
-  onOpen: () => void;
-}) {
-  const slugs = group.items.map((event) => sportsById.get(event.sportId)?.slug ?? '');
-  const colors = [...new Set(slugs)].map(sportColor);
-  const names = [
-    ...new Set(group.items.map((event) => sportsById.get(event.sportId)?.name ?? 'Спорт')),
-  ];
-  const count = group.items.length;
-  const label = `${meetings(count)} рядом: ${names.join(', ')}`;
-  return (
-    <Marker
-      position={at}
-      zIndexOffset={600}
-      eventHandlers={{ add: ariaLabel(label), click: onOpen }}
-      icon={cachedIcon(`group:${count}:${colors.join(',')}:${scale}`, () =>
-        clusterPin({ count, colors, scale }),
-      )}
-    >
-      <Tooltip direction="top" className="map-tip" opacity={1}>
-        <span className="map-tip__title">{meetings(count)} рядом</span>
-        <span className="map-tip__muted">{names.slice(0, 4).join(', ')}</span>
-        <span className="map-tip__muted">Нажмите, чтобы рассмотреть</span>
-      </Tooltip>
-    </Marker>
-  );
-}
-
 function EventPopup({ event, sport }: { event: EventMapItem; sport: Sport | undefined }) {
-  const places =
+  const seats =
     event.capacity === null
       ? `Участников: ${event.participantsCount}`
       : `Участников: ${event.participantsCount} из ${event.capacity}`;
@@ -393,7 +442,7 @@ function EventPopup({ event, sport }: { event: EventMapItem; sport: Sport | unde
       }
     >
       <span>{when(event)}</span>
-      <span>{places}</span>
+      <span>{seats}</span>
     </MapPopupCard>
   );
 }

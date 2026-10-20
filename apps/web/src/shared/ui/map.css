@@ -80,7 +80,8 @@
   align-items: center;
   justify-content: center;
 }
-.pin.is-selected .pin__body {
+.pin.is-selected .pin__body,
+.pin.is-busy .pin__body {
   outline: 3px solid var(--color-ink);
   outline-offset: 2px;
 }
@@ -101,18 +102,21 @@
 .pin__lock {
   --lock-k: max(var(--pin-k, 1), 0.75);
   position: absolute;
-  top: calc(-6px * var(--lock-k));
-  right: calc(-6px * var(--lock-k));
+  top: calc(-5px * var(--lock-k));
+  right: calc(-5px * var(--lock-k));
   display: flex;
   align-items: center;
   justify-content: center;
-  width: calc(22px * var(--lock-k));
-  height: calc(22px * var(--lock-k));
+  width: calc(19px * var(--lock-k));
+  height: calc(19px * var(--lock-k));
   border-radius: 50%;
   background: var(--color-ink);
 }
 
-/* Группа встреч (clusterPin): кольцо — цвета видов спорта внутри, в центре — сколько встреч. */
+/*
+ * Группа (clusterPin): у встреч кольцо — цвета видов спорта внутри, у площадок — жёлтый квадрат;
+ * в центре — сколько меток в группе.
+ */
 .map-cluster {
   display: flex;
   align-items: center;
@@ -126,13 +130,17 @@
   cursor: pointer;
   transition: transform 0.15s ease;
 }
+.map-cluster--square,
+.map-cluster--square .map-cluster__count {
+  border-radius: 30%;
+}
 .map-cluster__count {
   display: flex;
   align-items: center;
   justify-content: center;
   box-sizing: border-box;
-  width: calc(100% - 14px);
-  height: calc(100% - 14px);
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
   border: var(--border);
   border-radius: 50%;
   background: var(--color-surface);

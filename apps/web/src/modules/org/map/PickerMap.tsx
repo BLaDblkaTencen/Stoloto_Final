@@ -3,14 +3,23 @@
 //
 // До публикации на карте уже стоит временная метка встречи — такая, какой её увидят все:
 // цвет и иконка вида спорта, замок «по заявке»; пунктир — пока черновик. Над ней подпись:
-// название встречи и где она. Свою точку можно перетащить.
+// название встречи, площадка и адрес — тот же, что в поле «Адрес» (поставили метку на карте —
+// адрес точки пишется туда сам). Свою точку можно перетащить.
 import { VENUE_TYPE_LABELS, type JoinMode } from '@sport/shared';
 import type { Venue } from '@sport/shared/schemas/venues';
 import type L from 'leaflet';
 import { useEffect } from 'react';
 import { Marker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
-import { eventPin, pinIcon, pinScale, venuePin } from '../../../shared/ui';
+import { clusterPin, eventPin, pinIcon, pinScale, venuePin } from '../../../shared/ui';
 import { ariaLabel, BaseMap, cachedIcon, useMapZoom } from './BaseMap';
+import {
+  countOf,
+  expandGroup,
+  GROUP_RADIUS,
+  GroupMarker,
+  groupKey,
+  useScreenGroups,
+} from './groups';
 import type { PlaceValue } from './MapPicker';
 
 /** Что уже известно о встрече из формы: по этому рисуем её временную метку. */
@@ -63,21 +72,58 @@ function PickerMarkers({
   onPickVenue,
   onPickPoint,
 }: PickerMapProps) {
+  const map = useMap();
   // Вблизи метки мельче: не закрывают соседние и точнее стоят на месте (pinScale).
   const scale = pinScale(useMapZoom());
   const venueId = value?.kind === 'venue' ? value.venue.id : null;
+  // Выбранную площадку закрывает метка самой встречи; площадка — в карточке под картой.
+  // Налезающие друг на друга площадки — группа: нажатие приближает, дальше выбираем площадку.
+  const { groups, position } = useScreenGroups(
+    venues.filter((venue) => venue.id !== venueId),
+    (venue) => [venue.lat, venue.lng],
+    GROUP_RADIUS * scale,
+  );
   const at: [number, number] | null =
     value?.kind === 'venue'
       ? [value.venue.lat, value.venue.lng]
       : value?.kind === 'point'
         ? [value.lat, value.lng]
         : null;
-  const where = value?.kind === 'venue' ? value.venue.name : address.trim();
+  // Подпись над меткой: у площадки — её название и адрес, у своей точки — адрес из поля.
+  const lines = [value?.kind === 'venue' ? value.venue.name : '', address.trim()].filter(
+    (line, i, all) => line !== '' && all.indexOf(line) === i,
+  );
   return (
     <>
-      {venues.map((venue) => {
-        // Выбранную площадку закрывает метка самой встречи; площадка — в карточке под картой.
-        if (venue.id === venueId) return null;
+      {groups.map((group) => {
+        if (group.items.length > 1) {
+          const count = group.items.length;
+          const names = group.items.map((venue) => venue.name);
+          const places = countOf(count, ['площадка', 'площадки', 'площадок']);
+          return (
+            <GroupMarker
+              key={groupKey('venues', group)}
+              at={position(group)}
+              icon={cachedIcon(`venues:${count}:${scale}`, () =>
+                clusterPin({ count, colors: ['var(--color-accent)'], shape: 'square', scale }),
+              )}
+              label={`${places} рядом: ${names.join(', ')}`}
+              onClick={() =>
+                expandGroup(
+                  map,
+                  group.items.map((venue) => [venue.lat, venue.lng]),
+                )
+              }
+            >
+              <span className="map-tip__title">{places} рядом</span>
+              <span className="map-tip__muted">
+                {names.slice(0, 3).join(', ')}
+                {count > 3 && '…'}
+              </span>
+            </GroupMarker>
+          );
+        }
+        const venue = group.items[0];
         const suitable = venue.suitable ?? true;
         return (
           <Marker
@@ -106,7 +152,7 @@ function PickerMarkers({
         <DraftMarker
           at={at}
           draft={draft}
-          where={where}
+          lines={lines}
           scale={scale}
           // Метку на площадке не тащим: место задаёт площадка. Свою точку — можно.
           onMove={value?.kind === 'point' ? onPickPoint : undefined}
@@ -124,13 +170,14 @@ const cut = (text: string) => (text.length > LABEL_MAX ? `${text.slice(0, LABEL_
 function DraftMarker({
   at,
   draft,
-  where,
+  lines,
   scale,
   onMove,
 }: {
   at: [number, number];
   draft: PlaceDraft;
-  where: string;
+  /** Строки под названием: площадка, адрес. */
+  lines: string[];
   scale: number;
   onMove?: (lat: number, lng: number) => void;
 }) {
@@ -158,7 +205,11 @@ function DraftMarker({
     >
       <Tooltip permanent direction="top" className="map-label" opacity={1}>
         <span className="map-tip__title">{cut(title)}</span>
-        {where && <span className="map-tip__muted">{cut(where)}</span>}
+        {lines.map((line) => (
+          <span key={line} className="map-tip__muted">
+            {cut(line)}
+          </span>
+        ))}
       </Tooltip>
     </Marker>
   );

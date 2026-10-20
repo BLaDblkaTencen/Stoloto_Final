@@ -27,8 +27,10 @@ const VENUE_ICONS: Record<VenueType, IconName> = {
 
 export const venueTypeIcon = (type: VenueType): IconName => VENUE_ICONS[type];
 
-/** Ширина головки метки в пикселях на обзоре города. */
-const SIZE = { normal: 46, selected: 60, muted: 36 } as const;
+/** Ширина головки метки в пикселях на обзоре города (на 15% меньше макета: 46 → 39). */
+const SIZE = { normal: 39, selected: 51, muted: 31 } as const;
+/** Ширина обычной метки: от неё карта считает, какие метки налезают друг на друга. */
+export const PIN_SIZE = SIZE.normal;
 /** «Капля» — круг и острый конец снизу: высота ≈ 1,21 ширины (½ + √2⁄2). */
 const DROP_HEIGHT = 0.5 + Math.SQRT1_2;
 
@@ -56,6 +58,8 @@ type PinOptions = {
   muted?: boolean;
   /** Черновик: встреча ещё не опубликована (форма) — пунктирная обводка. */
   draft?: boolean;
+  /** Здесь уже есть встречи (площадка): обводка, но без увеличения — соседей не закрывает. */
+  busy?: boolean;
   /** Множитель размера, обычно pinScale(map.getZoom()). */
   scale?: number;
 };
@@ -69,6 +73,7 @@ export function pinIcon({
   locked = false,
   muted = false,
   draft = false,
+  busy = false,
   scale = 1,
 }: PinOptions) {
   const size = Math.round((selected ? SIZE.selected : muted ? SIZE.muted : SIZE.normal) * scale);
@@ -79,18 +84,19 @@ export function pinIcon({
     selected && 'is-selected',
     muted && 'is-muted',
     draft && 'is-draft',
+    busy && 'is-busy',
   ]
     .filter(Boolean)
     .join(' ');
   const lock = locked
-    ? `<span class="pin__lock">${svg('lock', Math.round(12 * Math.max(scale, 0.75)), '#fff', 2.6)}</span>`
+    ? `<span class="pin__lock">${svg('lock', Math.round(10 * Math.max(scale, 0.75)), '#fff', 2.6)}</span>`
     : '';
   const fill = muted ? 'var(--color-surface-muted)' : color;
   // Над меткой: попап и подпись открываются от её верха, а не закрывают её.
   const above: [number, number] = [0, -height + 2];
   return {
     // --pin-size — ширина головки, --pin-k уменьшает замок вместе с меткой (map.css).
-    html: `<span class="${classes}" style="--pin-color:${fill};--pin-size:${size}px;--pin-k:${scale}"><span class="pin__body"></span><span class="pin__icon">${svg(icon, Math.round((selected ? 28 : 22) * scale), 'currentColor', 2)}</span>${lock}</span>`,
+    html: `<span class="${classes}" style="--pin-color:${fill};--pin-size:${size}px;--pin-k:${scale}"><span class="pin__body"></span><span class="pin__icon">${svg(icon, Math.round((selected ? 24 : 19) * scale), 'currentColor', 2)}</span>${lock}</span>`,
     // Пустой className убирает белый квадрат, который Leaflet рисует под divIcon по умолчанию.
     className: '',
     iconSize: [size, height] as [number, number],
@@ -117,37 +123,46 @@ export const eventPin = (o: {
     scale: o.scale,
   });
 
-/** Метка площадки: квадрат с иконкой типа; подходящие виду спорта — яркие, остальные — приглушённые. */
+/**
+ * Метка площадки: квадрат с иконкой типа; подходящие виду спорта — яркие, остальные —
+ * приглушённые; где уже есть встречи — с обводкой (busy).
+ */
 export const venuePin = (o: {
   type: VenueType;
   suitable: boolean;
   selected?: boolean;
+  busy?: boolean;
   scale?: number;
 }) =>
   pinIcon({
     icon: venueTypeIcon(o.type),
     color: 'var(--color-accent)',
     shape: 'badge',
-    muted: !o.suitable && !o.selected,
+    muted: !o.suitable && !o.selected && !o.busy,
     selected: o.selected,
+    busy: o.busy,
     scale: o.scale,
   });
 
 /**
- * Группа встреч, которые на этом масштабе налезли бы друг на друга: круг с числом, кольцо —
- * цвета видов спорта внутри (до шести). Чем больше встреч, тем крупнее круг.
+ * Группа меток, которые на этом масштабе налезли бы друг на друга: встречи — круг с числом,
+ * кольцо — цвета видов спорта внутри (до шести); площадки — жёлтый квадрат с числом.
+ * Чем больше меток, тем крупнее группа.
  */
 export function clusterPin({
   count,
   colors,
+  shape = 'circle',
   scale = 1,
 }: {
   count: number;
   /** CSS-цвета видов спорта в группе, например sportColor(slug). */
   colors: string[];
+  /** circle — встречи, square — площадки (как их метки). */
+  shape?: 'circle' | 'square';
   scale?: number;
 }) {
-  const base = count < 5 ? 48 : count < 10 ? 54 : 60;
+  const base = count < 5 ? 41 : count < 10 ? 46 : 51;
   const size = Math.round(base * Math.max(scale, 0.8));
   const ring = [...new Set(colors)].slice(0, 6);
   const step = 100 / Math.max(ring.length, 1);
@@ -155,7 +170,7 @@ export function clusterPin({
     ? `conic-gradient(${ring.map((color, i) => `${color} ${i * step}% ${(i + 1) * step}%`).join(', ')})`
     : 'var(--color-accent)';
   return {
-    html: `<span class="map-cluster" style="--ring:${gradient}"><span class="map-cluster__count">${count}</span></span>`,
+    html: `<span class="map-cluster map-cluster--${shape}" style="--ring:${gradient}"><span class="map-cluster__count">${count}</span></span>`,
     className: '',
     iconSize: [size, size] as [number, number],
     iconAnchor: [size / 2, size / 2] as [number, number],

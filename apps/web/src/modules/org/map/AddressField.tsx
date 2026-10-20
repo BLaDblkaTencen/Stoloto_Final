@@ -2,21 +2,22 @@
 //
 //   <AddressField value={address} onChange={setAddress} place={place} onPlace={setPlace} … />
 //
-// Адрес пишут сами, его текст мы не меняем. Вписанное показываем на карте: после паузы в наборе
-// (или сразу по Enter) ставим точку по адресу. Не туда — нажатие на карту переставляет точку, а
-// следующая правка адреса снова ставит её по адресу: действует то, что сделали последним.
+// Связь в обе стороны, действует то, что сделали последним:
+// - вписали адрес — после паузы в наборе (или сразу по Enter) метка встаёт по нему;
+// - поставили или перетащили метку на карте — в поле пишется адрес этой точки, он же
+//   в подписи над меткой. Дописали к нему подробности («…, подъезд 2») — метка остаётся на месте.
 // Подсказок на каждую букву нет — так требуют правила Nominatim; повторы берутся из кэша.
 import type { GeocodePlace } from '@sport/shared/schemas/geocoding';
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../../shared/api/client';
 import { TextField } from '../../../shared/ui';
-import { geocodeAddress } from './api';
+import { geocodeAddress, reverseGeocode } from './api';
 import type { PlaceValue } from './MapPicker';
 
 export type AddressFieldProps = {
   value: string;
   onChange: (value: string) => void;
-  /** Место встречи из MapPicker: по адресу ставим точку; у площадки точка своя. */
+  /** Место встречи из MapPicker: по адресу ставим метку, по метке пишем адрес. */
   place: PlaceValue;
   onPlace: (place: PlaceValue) => void;
   hint: string;
@@ -33,7 +34,13 @@ type Status =
   | { kind: 'searching' }
   | { kind: 'shown'; place: GeocodePlace; houseMissing: boolean }
   | { kind: 'notFound' }
+  | { kind: 'locating' }
+  | { kind: 'picked'; place: GeocodePlace }
+  | { kind: 'noAddress' }
   | { kind: 'failed'; message: string };
+
+const where = (place: GeocodePlace) =>
+  place.context ? `${place.label}, ${place.context}` : place.label;
 
 export function AddressField({
   value,
@@ -47,8 +54,11 @@ export function AddressField({
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   // Адрес, который уже стоит на карте (или с которым форма открылась): его не ищем заново.
   const shown = useRef(value.trim());
+  // Адрес, который вписали сами по метке: подробности к нему не двигают метку.
+  const filled = useRef('');
   const request = useRef(0);
-  // Что сделали последним: правку адреса или нажатие на карту. Таймер паузы не перебивает клик.
+  // Что сделали последним: правку адреса или метку на карте. Таймер паузы не перебивает метку,
+  // а найденный по метке адрес не затирает то, что начали печатать.
   const lastEdit = useRef<'typed' | 'map'>('typed');
   const venue = place?.kind === 'venue';
 
@@ -80,25 +90,62 @@ export function AddressField({
     }
   };
 
-  // Набрали адрес и остановились — показываем его на карте. У площадки точка своя: адрес — уточнение.
+  // Набрали адрес и остановились — ставим метку по нему. У площадки метка своя: адрес — уточнение.
   useEffect(() => {
     const q = value.trim();
     if (venue || q.length < MIN_LENGTH || q === shown.current) return;
+    // Дописали подробности к адресу метки («…, подъезд 2») — метка остаётся, где её поставили.
+    if (filled.current && q.startsWith(filled.current)) return;
     const timer = setTimeout(() => {
       if (lastEdit.current === 'typed') void show(q);
     }, TYPING_PAUSE_MS);
     return () => clearTimeout(timer);
   }, [value, venue]);
 
-  // Точку переставили на карте или выбрали площадку — статус поиска больше не про это место.
-  const manual = place?.kind === 'point' && !place.found;
+  // Метку поставили или перетащили на карте — пишем в поле адрес этой точки. Ключ — координаты;
+  // точку, с которой открылась форма правки, не трогаем: её адрес уже вписан.
+  const manual = place?.kind === 'point' && !place.found ? place : null;
+  const pointKey = manual ? `${manual.lat},${manual.lng}` : null;
+  const initialPoint = useRef(pointKey);
   useEffect(() => {
-    if (manual || venue || !place) {
-      if (manual) lastEdit.current = 'map';
+    if (!manual) return;
+    lastEdit.current = 'map';
+    if (pointKey === initialPoint.current) return;
+    const id = ++request.current;
+    setStatus({ kind: 'locating' });
+    reverseGeocode(manual.lat, manual.lng)
+      .then(({ place: near }) => {
+        if (id !== request.current) return;
+        if (!near) {
+          setStatus({ kind: 'noAddress' });
+          return;
+        }
+        setStatus({ kind: 'picked', place: near });
+        // Пока искали, начали печатать сами — своё не затираем.
+        if (lastEdit.current !== 'map') return;
+        shown.current = near.label;
+        filled.current = near.label;
+        onChange(near.label);
+      })
+      .catch((err: unknown) => {
+        if (id !== request.current) return;
+        setStatus({
+          kind: 'failed',
+          message:
+            err instanceof ApiError
+              ? err.message
+              : 'Не получилось узнать адрес метки. Впишите его сами',
+        });
+      });
+  }, [pointKey]);
+
+  // Выбрали площадку или убрали место — прежний поиск больше не про это место.
+  useEffect(() => {
+    if (venue || !place) {
       request.current += 1;
       setStatus({ kind: 'idle' });
     }
-  }, [manual, venue, place]);
+  }, [venue, place]);
 
   return (
     <div className="flex flex-col gap-2">
@@ -123,7 +170,7 @@ export function AddressField({
       />
       {!venue && (
         <p aria-live="polite" className="text-sm text-ink-muted">
-          {statusText(status, manual)}
+          {statusText(status, Boolean(manual))}
         </p>
       )}
     </div>
@@ -131,23 +178,24 @@ export function AddressField({
 }
 
 function statusText(status: Status, manual: boolean) {
-  if (manual) return 'Метка стоит там, где вы её поставили. Адрес — как вы его написали.';
   switch (status.kind) {
     case 'searching':
       return 'Показываем адрес на карте…';
-    case 'shown': {
-      const where = status.place.context
-        ? `${status.place.label}, ${status.place.context}`
-        : status.place.label;
+    case 'shown':
       return status.houseMissing
-        ? `Дом не нашли, точка стоит на месте «${where}». Нажмите на карту, где именно встречаетесь.`
-        : `На карте: ${where}. Не там — нажмите на карту в нужном месте.`;
-    }
+        ? `Дом не нашли, метка стоит на месте «${where(status.place)}». Перетащите её туда, где встречаетесь.`
+        : `На карте: ${where(status.place)}. Не там — перетащите метку или нажмите на карту в нужном месте.`;
     case 'notFound':
       return 'Такой адрес на карте не нашли. Нажмите на карту, где встречаетесь, — адрес останется вашим.';
+    case 'locating':
+      return 'Узнаём адрес метки…';
+    case 'picked':
+      return `Адрес метки: ${where(status.place)}. Можно дописать подробности — метка останется на месте.`;
+    case 'noAddress':
+      return 'У этого места на карте нет адреса. Впишите, как его найти: например «Центральный парк, у фонтана».';
     case 'failed':
       return status.message;
     default:
-      return '';
+      return manual ? 'Метка стоит там, где вы её поставили.' : '';
   }
 }
