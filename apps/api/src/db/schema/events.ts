@@ -4,6 +4,7 @@
 // Поля модерации (status, moderation_reason, moderated_by, moderated_at) меняет только модуль admin.
 import { relations, sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   doublePrecision,
   foreignKey,
@@ -53,6 +54,9 @@ export const events = pgTable(
     level: eventLevel('level').notNull().default('any'),
     requirements: text('requirements'),
     capacity: integer('capacity'),
+    // Организатор закрыл запись до начала: новых записей и заявок нет, записанные остаются,
+    // ждущие заявки ещё можно рассмотреть. После начала запись закрыта и без этого флага.
+    registrationClosed: boolean('registration_closed').notNull().default(false),
     chatUrl: text('chat_url'),
     status: eventStatus('status').notNull().default('published'),
     moderationReason: text('moderation_reason'),

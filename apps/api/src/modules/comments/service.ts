@@ -20,6 +20,7 @@ async function loadEvent(eventId: string, viewer: Viewer) {
       createdBy: events.createdBy,
       joinMode: events.joinMode,
       capacity: events.capacity,
+      registrationClosed: events.registrationClosed,
       organizationName: organizations.name,
     })
     .from(events)

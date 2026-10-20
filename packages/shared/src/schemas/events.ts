@@ -149,17 +149,23 @@ export const createEventSchema = eventFields.superRefine((value, ctx) => {
   checkPoint(value, ctx);
 });
 
-/** Правка: любые поля создания, все необязательные. Связь начала и окончания проверяет сервер. */
-export const updateEventSchema = eventFields.partial().superRefine((value, ctx) => {
-  if (value.sportId && value.sportName) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['sportId'],
-      message: 'Выберите вид спорта из списка или впишите свой',
-    });
-  }
-  checkPoint(value, ctx);
-});
+/**
+ * Правка: любые поля создания, все необязательные. Связь начала и окончания проверяет сервер.
+ * registrationClosed — только здесь: при создании запись всегда открыта.
+ */
+export const updateEventSchema = eventFields
+  .partial()
+  .extend({ registrationClosed: z.boolean('Запись: открыта или закрыта').optional() })
+  .superRefine((value, ctx) => {
+    if (value.sportId && value.sportName) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['sportId'],
+        message: 'Выберите вид спорта из списка или впишите свой',
+      });
+    }
+    checkPoint(value, ctx);
+  });
 
 /** Тело формы, как его отправляет интерфейс. */
 export type EventInput = z.input<typeof createEventSchema>;
@@ -270,6 +276,8 @@ export type EventListItem = {
   participantsCount: number;
   /** null — без ограничения. */
   freeSlots: number | null;
+  /** Организатор закрыл запись до начала встречи; после начала запись закрыта и так. */
+  registrationClosed: boolean;
   organizer: Organizer;
   myRegistration: MyRegistration;
 };

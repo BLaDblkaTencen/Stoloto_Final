@@ -21,6 +21,7 @@ const event = (patch: Partial<RuleEvent> = {}): RuleEvent => ({
   createdBy: 'author',
   joinMode: 'free',
   capacity: null,
+  registrationClosed: false,
   ...patch,
 });
 
@@ -75,6 +76,18 @@ describe('кто может записаться', () => {
     expect(denialCode(event({ capacity: 3 }), user, null, 2)).toBeNull();
     expect(denialCode(event({ capacity: 3 }), user, null, 3)).toBe('EVENT_FULL');
     expect(denialCode(event({ capacity: null }), user, null, 500)).toBeNull();
+  });
+
+  it('организатор закрыл запись: новых нет, записанным — прежний ответ, отменить можно', () => {
+    const closed = event({ registrationClosed: true });
+    expect(denialCode(closed, user)).toBe('REGISTRATION_CLOSED');
+    expect(denialCode(event({ registrationClosed: true, joinMode: 'request' }), user)).toBe(
+      'REGISTRATION_CLOSED',
+    );
+    expect(denialCode(closed, user, 'cancelled')).toBe('REGISTRATION_CLOSED');
+    expect(denialCode(closed, user, 'confirmed')).toBe('ALREADY_REGISTERED');
+    expect(cancelDenial(closed, 'confirmed', now)).toBeNull();
+    expect(eventPermissions(closed, user, null, 0, now).canJoin).toBe(false);
   });
 });
 

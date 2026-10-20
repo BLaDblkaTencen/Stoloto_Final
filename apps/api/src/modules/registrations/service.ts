@@ -38,6 +38,7 @@ async function lockEvent(tx: Tx, eventId: string) {
       createdBy: events.createdBy,
       joinMode: events.joinMode,
       capacity: events.capacity,
+      registrationClosed: events.registrationClosed,
     })
     .from(events)
     .where(eq(events.id, eventId))
