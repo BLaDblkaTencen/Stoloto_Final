@@ -4,7 +4,7 @@ import type { ButtonHTMLAttributes } from 'react';
 import { Link, type LinkProps } from 'react-router';
 
 type Variant = 'primary' | 'dark' | 'secondary' | 'danger' | 'accent' | 'request';
-type Size = 'md' | 'lg';
+type Size = 'md' | 'lg' | 'xl';
 
 // Тень — у каждого варианта своя, а не общим классом: два класса тени спорили бы между собой.
 const INK_SHADOW = 'shadow-sm hover:shadow-md disabled:shadow-sm';
@@ -22,14 +22,18 @@ const VARIANTS: Record<Variant, string> = {
   request: `bg-status-request text-ink hover:text-ink ${INK_SHADOW}`,
 };
 
+// Скругление — в размере, а не общим классом: у xl оно другое, а два класса спорили бы.
 const SIZES: Record<Size, string> = {
-  md: 'min-h-[var(--control-height)] px-5 text-sm',
-  lg: 'min-h-[var(--control-height-lg)] px-[26px] text-base',
+  md: 'min-h-[var(--control-height)] rounded-md px-5 text-sm',
+  lg: 'min-h-[var(--control-height-lg)] rounded-md px-[26px] text-base',
+  // Таблетка для одного главного действия на экране («Опубликовать встречу»).
+  // На телефоне — мельче, чтобы подпись помещалась в одну строку.
+  xl: 'min-h-16 rounded-full px-5 text-[18px] sm:min-h-[72px] sm:pr-[30px] sm:pl-10 sm:text-[21px]',
 };
 
 export function buttonClass(variant: Variant = 'primary', size: Size = 'md', extra = '') {
   return [
-    'inline-flex items-center justify-center gap-2 rounded-md border-2 border-ink font-semibold',
+    'inline-flex items-center justify-center gap-2 border-2 border-ink font-semibold',
     'no-underline transition-[translate,box-shadow] duration-100 cursor-pointer',
     'hover:-translate-x-px hover:-translate-y-px',
     'active:translate-x-0.5 active:translate-y-0.5 active:shadow-none',
