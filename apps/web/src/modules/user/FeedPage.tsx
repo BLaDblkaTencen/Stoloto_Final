@@ -404,11 +404,12 @@ function EventsSplit({
   return (
     <section aria-label="Встречи" className="flex flex-col gap-5">
       {!wide && (
+        // Выбранный вид — жёлтый, как выбранный чип вида спорта.
         <div role="group" aria-label="Как показать встречи" className="flex gap-2">
-          <Button variant={view === 'list' ? 'dark' : 'secondary'} onClick={() => onView('list')}>
+          <Button variant={view === 'list' ? 'accent' : 'secondary'} onClick={() => onView('list')}>
             Список
           </Button>
-          <Button variant={view === 'map' ? 'dark' : 'secondary'} onClick={() => onView('map')}>
+          <Button variant={view === 'map' ? 'accent' : 'secondary'} onClick={() => onView('map')}>
             Карта
           </Button>
         </div>
