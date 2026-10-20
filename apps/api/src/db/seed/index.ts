@@ -16,6 +16,7 @@ import {
   EVENTS,
   ORGANIZATIONS,
   REGISTRATIONS,
+  REVIEWS,
   SPORTS,
   USERS,
   VENUES,
@@ -23,7 +24,7 @@ import {
 } from './data';
 import { daysAgo, HOUR, krasnoyarskTime } from './time';
 
-export const SEED_VERSION = 2;
+export const SEED_VERSION = 3;
 const VERSION_KEY = 'seed_version';
 
 /** Стереть все данные и наполнить базу заново. */
@@ -40,6 +41,17 @@ export async function seed(db: Db, now = new Date()) {
   const orgId = new Map(ORGANIZATIONS.map((org) => [org.key, randomUUID()]));
   const eventId = new Map(EVENTS.map((event) => [event.key, randomUUID()]));
   const admin = userId.admin;
+  // Начало и конец каждого события: прошедшим записи и отзывы ставим во времени до и после них.
+  const startOf = new Map(
+    EVENTS.map((event) => [event.key, krasnoyarskTime(event.when.days, event.when.time, now)]),
+  );
+  const endOf = (key: string) => {
+    const event = EVENTS.find((item) => item.key === key)!;
+    return new Date(need(startOf, key).getTime() + (event.when.hours ?? 1) * HOUR);
+  };
+  /** Не позже of минус days дней: прошедшее событие создано и записано до своего начала. */
+  const before = (of: Date, days: number) =>
+    new Date(Math.min(daysAgo(now, days).getTime(), of.getTime() - days * 24 * HOUR));
   const need = <T>(map: Map<string, T>, key: string) => {
     const value = map.get(key);
     if (value === undefined) throw new Error(`В демо-данных нет ключа «${key}»`);
@@ -123,7 +135,7 @@ export async function seed(db: Db, now = new Date()) {
     await tx.insert(schema.events).values(
       EVENTS.map((event) => {
         const venue = event.venue ? need(venueById, event.venue) : undefined;
-        const start = krasnoyarskTime(event.when.days, event.when.time, now);
+        const start = need(startOf, event.key);
         return {
           id: need(eventId, event.key),
           title: event.title,
@@ -148,7 +160,7 @@ export async function seed(db: Db, now = new Date()) {
           moderationReason: event.unpublishedReason ?? null,
           moderatedBy: event.unpublishedReason ? admin : null,
           moderatedAt: event.unpublishedReason ? daysAgo(now, 1) : null,
-          createdAt: daysAgo(now, 3),
+          createdAt: before(start, 3),
         };
       }),
     );
@@ -166,11 +178,44 @@ export async function seed(db: Db, now = new Date()) {
           status,
           message: message ?? null,
           decidedBy: decided ? need(authorOf, event) : null,
-          decidedAt: decided ? daysAgo(now, 1) : null,
-          createdAt: daysAgo(now, 2),
+          decidedAt: decided ? before(need(startOf, event), 1) : null,
+          createdAt: before(need(startOf, event), 2),
         };
       }),
     );
+
+    // Отзывы: участник — об организаторе встречи (клубе, если встреча от его имени),
+    // организатор — об участнике. Время — через пару часов после конца встречи.
+    const orgOf = new Map(EVENTS.map((event) => [event.key, event.organization]));
+    if (REVIEWS.length) {
+      await tx.insert(schema.reviews).values(
+        REVIEWS.map((review) => {
+          const org = orgOf.get(review.event);
+          const at = new Date(
+            Math.min(now.getTime(), endOf(review.event).getTime() + (review.about ? 2 : 3) * HOUR),
+          );
+          return {
+            eventId: need(eventId, review.event),
+            authorId: userId[review.author],
+            direction: review.about
+              ? ('organizer_to_participant' as const)
+              : ('participant_to_organizer' as const),
+            targetUserId: review.about
+              ? userId[review.about]
+              : org
+                ? null
+                : need(authorOf, review.event),
+            targetOrgId: !review.about && org ? need(orgId, org) : null,
+            attended: review.about ? (review.attended ?? true) : null,
+            rating: review.rating ?? null,
+            tags: review.tags ?? [],
+            comment: review.comment ?? null,
+            createdAt: at,
+            updatedAt: at,
+          };
+        }),
+      );
+    }
 
     let minute = 0;
     const commentRows = COMMENTS.flatMap((comment) => {

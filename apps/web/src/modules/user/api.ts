@@ -1,4 +1,4 @@
-// Запросы зоны «Пользователь»: виды спорта, мероприятия, запись, обсуждение, профиль.
+// Запросы зоны «Пользователь»: виды спорта, мероприятия, запись, обсуждение, профиль, отзывы.
 // Контракт — docs/api/events.md. Ключи кэша начинаются с 'events' и 'registrations': после записи
 // или отмены обновляем оба, чтобы лента, карточка и «Мои записи» сразу показывали новый статус.
 import type {
@@ -12,6 +12,14 @@ import type {
 import type { Comment, CommentInput } from '@sport/shared/schemas/comments';
 import type { ProfileInput, UserProfile } from '@sport/shared/schemas/profiles';
 import type { MyRegistrationItem } from '@sport/shared/schemas/registrations';
+import type {
+  Attendance,
+  AttendanceInput,
+  MyReview,
+  OrganizationReviews,
+  ParticipantReviewInput,
+  UserReviews,
+} from '@sport/shared/schemas/reviews';
 import type { Sport } from '@sport/shared/schemas/sports';
 import {
   keepPreviousData,
@@ -197,6 +205,60 @@ export function useAddComment(eventId: string) {
     // Без ожидания: форма очищается сразу, а список обновится следом.
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['events', 'comments', eventId] });
+    },
+  });
+}
+
+// ---------- Отзывы после встречи ----------
+
+export function useUserReviews(userId: string) {
+  return useQuery({
+    queryKey: ['reviews', 'user', userId],
+    queryFn: () => api<UserReviews>(`/users/${userId}/reviews`),
+  });
+}
+
+/** Отзывы о клубе: только у допущенного, у остальных страница их не запрашивает. */
+export function useOrganizationReviews(orgId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['reviews', 'organization', orgId],
+    queryFn: () => api<OrganizationReviews>(`/organizations/${orgId}/reviews`),
+    enabled,
+  });
+}
+
+/** После отзыва меняются «Мои записи», оценка организатора в карточке и отзывы в профилях. */
+function invalidateAfterReview(queryClient: ReturnType<typeof useQueryClient>) {
+  void queryClient.invalidateQueries({ queryKey: ['registrations'] });
+  void queryClient.invalidateQueries({ queryKey: ['events'] });
+  void queryClient.invalidateQueries({ queryKey: ['reviews'] });
+}
+
+export function useSubmitReview(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: ParticipantReviewInput) =>
+      api<MyReview>(`/events/${eventId}/review`, { method: 'PUT', json: body }),
+    onSuccess: () => invalidateAfterReview(queryClient),
+  });
+}
+
+export function useAttendance(eventId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['events', 'attendance', eventId],
+    queryFn: () => api<Attendance>(`/events/${eventId}/attendance`),
+    enabled,
+  });
+}
+
+export function useSaveAttendance(eventId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: AttendanceInput) =>
+      api<Attendance>(`/events/${eventId}/attendance`, { method: 'PUT', json: body }),
+    onSuccess: (attendance) => {
+      queryClient.setQueryData(['events', 'attendance', eventId], attendance);
+      invalidateAfterReview(queryClient);
     },
   });
 }

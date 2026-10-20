@@ -7,4 +7,5 @@ export * from './venues';
 export * from './events';
 export * from './registrations';
 export * from './comments';
+export * from './reviews';
 export * from './audit';

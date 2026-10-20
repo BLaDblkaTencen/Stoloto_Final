@@ -9,6 +9,7 @@ import {
   type UserRole,
   type VenueType,
 } from '@sport/shared';
+import type { ReviewTag } from '@sport/shared/schemas/reviews';
 
 const demo = (email: string) => {
   const account = DEMO_ACCOUNTS.find((a) => a.email === email);
@@ -481,6 +482,82 @@ export const EVENTS: SeedEvent[] = [
     venue: 'dinamika',
     unpublishedReason: 'Это объявление о продаже, а не совместная активность.',
   },
+
+  // ---------- Прошедшие встречи: отзывы и надёжность (DEMO_DATA.md, «Отзывы») ----------
+  {
+    key: 'pastChessNight',
+    title: 'Шахматы в антикафе',
+    description: 'Свободные партии и разбор дебютов для новичков. Доски и часы клуба.',
+    sport: 'Шахматы',
+    author: 'orgApproved',
+    organization: 'chessClub',
+    when: { days: -10, time: '18:00', hours: 3 },
+    joinMode: 'free',
+    level: 'beginner',
+    capacity: 12,
+    venue: 'hodKonem',
+  },
+  {
+    key: 'pastBlitz',
+    title: 'Блиц-турнир: осенний этап',
+    description: 'Семь туров по пять минут, швейцарская система.',
+    sport: 'Шахматы',
+    author: 'orgApproved',
+    organization: 'chessClub',
+    when: { days: -24, time: '18:00', hours: 3 },
+    joinMode: 'request',
+    level: 'amateur',
+    capacity: 16,
+    venue: 'endshpil',
+  },
+  {
+    key: 'pastTennis',
+    title: 'Настольный теннис: вечер одиночек',
+    description: 'Играем одиночные партии до 11 очков, соперников подбираем по уровню.',
+    sport: 'Настольный теннис',
+    author: 'user3',
+    when: { days: -15, time: '19:00', hours: 2 },
+    joinMode: 'request',
+    level: 'amateur',
+    capacity: 8,
+    venue: 'sharik',
+  },
+  {
+    key: 'pastNordic',
+    title: 'Скандинавская ходьба: первая встреча',
+    description: 'Знакомство с техникой и час ходьбы по аллеям.',
+    sport: 'Скандинавская ходьба',
+    author: 'user3',
+    when: { days: -30, time: '09:00', hours: 1 },
+    joinMode: 'free',
+    level: 'any',
+    address: 'Центральный парк, у фонтана',
+    point: { lat: 56.0085, lng: 92.8522 },
+  },
+  {
+    key: 'pastRun',
+    title: 'Вечерняя пробежка по набережной',
+    description: '6 км вдоль Енисея в спокойном темпе.',
+    sport: 'Бег',
+    author: 'user3',
+    when: { days: -2, time: '19:00', hours: 1 },
+    joinMode: 'free',
+    level: 'any',
+    address: 'Набережная Енисея, у Коммунального моста',
+    point: { lat: 56.0067, lng: 92.8705 },
+  },
+  {
+    key: 'pastVolleyball',
+    title: 'Волейбол: вечерняя игра',
+    description: 'Два часа в зале, шесть на шесть.',
+    sport: 'Волейбол',
+    author: 'user1',
+    when: { days: -1, time: '19:00', hours: 2 },
+    joinMode: 'request',
+    level: 'amateur',
+    capacity: 12,
+    venue: 'dinamika',
+  },
 ];
 
 /** Записи: [событие, участник, статус, сообщение организатору]. Решения по заявкам — от автора события. */
@@ -501,6 +578,145 @@ export const REGISTRATIONS: [string, UserKey, 'confirmed' | 'pending' | 'rejecte
   ['volleyball', 'user3', 'pending', 'Новичок, но очень хочу попробовать'],
   ['basketball', 'user1', 'confirmed'],
   ['spam', 'user1', 'confirmed'],
+  ['pastChessNight', 'user1', 'confirmed'],
+  ['pastChessNight', 'user2', 'confirmed'],
+  ['pastChessNight', 'user3', 'confirmed'],
+  ['pastBlitz', 'user2', 'confirmed'],
+  ['pastBlitz', 'user3', 'confirmed'],
+  ['pastTennis', 'user1', 'confirmed'],
+  ['pastTennis', 'user2', 'confirmed'],
+  ['pastNordic', 'user2', 'confirmed'],
+  ['pastRun', 'user1', 'confirmed'],
+  ['pastRun', 'user2', 'confirmed'],
+  ['pastVolleyball', 'user2', 'confirmed'],
+  ['pastVolleyball', 'user3', 'confirmed'],
+];
+
+/**
+ * Отзывы о прошедших встречах. Без about — участник оценивает организатора встречи (человека
+ * или клуб); с about — организатор отмечает этого участника. Нарочно не заполнено, чтобы эксперт
+ * сделал сам: Иван ещё не оценил «Вечернюю пробежку» и не отметил участников «Волейбола».
+ */
+export type SeedReview = {
+  event: string;
+  author: UserKey;
+  about?: UserKey;
+  attended?: boolean;
+  rating?: number;
+  tags?: ReviewTag[];
+  comment?: string;
+};
+
+export const REVIEWS: SeedReview[] = [
+  // Шахматы в антикафе: обе стороны высказались, всё видно.
+  {
+    event: 'pastChessNight',
+    author: 'orgApproved',
+    about: 'user1',
+    attended: true,
+    rating: 5,
+    tags: ['comes_on_time'],
+  },
+  {
+    event: 'pastChessNight',
+    author: 'orgApproved',
+    about: 'user2',
+    attended: true,
+    rating: 5,
+    tags: ['helps_others'],
+    comment: 'Помогла новичкам разобраться с часами.',
+  },
+  { event: 'pastChessNight', author: 'orgApproved', about: 'user3', attended: true, rating: 4 },
+  {
+    event: 'pastChessNight',
+    author: 'user1',
+    rating: 5,
+    tags: ['as_described', 'friendly'],
+    comment: 'Уютно, объяснили правила блица и дали сыграть с сильными.',
+  },
+  { event: 'pastChessNight', author: 'user2', rating: 5, tags: ['newbie_friendly'] },
+  {
+    event: 'pastChessNight',
+    author: 'user3',
+    rating: 4,
+    tags: ['friendly'],
+    comment: 'Начали на 15 минут позже, но в целом здорово.',
+  },
+  // Блиц: Алексей не пришёл — у него неявка в надёжности.
+  {
+    event: 'pastBlitz',
+    author: 'orgApproved',
+    about: 'user2',
+    attended: true,
+    rating: 5,
+    tags: ['keeps_word'],
+  },
+  {
+    event: 'pastBlitz',
+    author: 'orgApproved',
+    about: 'user3',
+    attended: false,
+    comment: 'Не пришёл и не предупредил.',
+  },
+  {
+    event: 'pastBlitz',
+    author: 'user2',
+    rating: 5,
+    tags: ['want_more'],
+    comment: 'Турнир провели чётко, хочу на следующий этап.',
+  },
+  // Встречи Алексея: у него как у организатора набирается оценка.
+  {
+    event: 'pastTennis',
+    author: 'user3',
+    about: 'user1',
+    attended: true,
+    rating: 5,
+    tags: ['comes_on_time'],
+  },
+  { event: 'pastTennis', author: 'user3', about: 'user2', attended: true, rating: 4 },
+  {
+    event: 'pastTennis',
+    author: 'user1',
+    rating: 5,
+    tags: ['as_described'],
+    comment: 'Алексей подобрал соперников по уровню, никто не скучал.',
+  },
+  { event: 'pastTennis', author: 'user2', rating: 4, tags: ['friendly'] },
+  { event: 'pastNordic', author: 'user3', about: 'user2', attended: true },
+  {
+    event: 'pastNordic',
+    author: 'user2',
+    rating: 5,
+    tags: ['newbie_friendly'],
+    comment: 'Показали технику и дали палки на пробу.',
+  },
+  // Пробежка: Алексей отметил всех, Мария оценила. Отзыв об Иване откроется, когда Иван оценит сам.
+  {
+    event: 'pastRun',
+    author: 'user3',
+    about: 'user1',
+    attended: true,
+    rating: 5,
+    tags: ['team_player'],
+    comment: 'Держал темп всей группы, спасибо!',
+  },
+  { event: 'pastRun', author: 'user3', about: 'user2', attended: true },
+  {
+    event: 'pastRun',
+    author: 'user2',
+    rating: 5,
+    tags: ['started_on_time'],
+    comment: 'Хороший темп, Алексей подождал отстающих.',
+  },
+  // Волейбол Ивана: Мария уже оценила, но отзыв откроется, когда Иван отметит участников.
+  {
+    event: 'pastVolleyball',
+    author: 'user2',
+    rating: 5,
+    tags: ['as_described'],
+    comment: 'Отличная игра, команды получились ровные.',
+  },
 ];
 
 export type SeedComment = {

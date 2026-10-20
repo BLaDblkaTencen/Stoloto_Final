@@ -12,6 +12,7 @@ import {
   type VenueType,
 } from '../enums';
 import { sportNameSchema, type Sport } from './sports';
+import type { AttendanceState, OrganizerSummary } from './reviews';
 
 /**
  * Часовой пояс, в котором показываем время и считаем границы дня в фильтре по дате.
@@ -326,6 +327,8 @@ export type EventDetails = EventListItem & {
   participants: { id: string; name: string }[] | null;
   permissions: EventPermissions;
   joinBlock: JoinBlock | null;
+  /** Оценка организатора участниками прошлых встреч: человека или клуба. */
+  organizerRating: OrganizerSummary;
 };
 
 /** Событие в «Моих мероприятиях» организатора. */
@@ -333,6 +336,8 @@ export type MyEventItem = EventListItem & {
   status: EventStatus;
   moderationReason: string | null;
   pendingCount: number;
+  /** Только у прошедших опубликованных: отметить, кто пришёл. */
+  attendance: AttendanceState | null;
 };
 
 export type ListResponse<T> = { items: T[]; total: number };

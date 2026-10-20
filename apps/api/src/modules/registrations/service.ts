@@ -20,6 +20,7 @@ import { events, registrations, users } from '../../db/schema';
 import { AppError } from '../../lib/errors';
 import type { SessionUser } from '../auth/session';
 import { selectEvents, toListItem } from '../events/queries';
+import { participantSummaries, reviewStates } from '../reviews/service';
 import { cancelDenial, canSeeEvent, isPast, joinDenial, type Denial } from '../events/rules';
 import { eventHidden, eventNotFound } from '../events/service';
 
@@ -169,6 +170,8 @@ export async function listMyRegistrations(
       .offset(query.offset),
     db.select({ total: count() }).from(events).where(where),
   ]);
+  // Оценить можно только прошедшую встречу: для предстоящих в базу за отзывами не ходим.
+  const reviews = upcoming ? new Map() : await reviewStates(user.id, rows, now);
   const items: MyRegistrationItem[] = [];
   for (const row of rows) {
     const item = toListItem(row);
@@ -178,6 +181,7 @@ export async function listMyRegistrations(
       myRegistration: item.myRegistration,
       status: row.status,
       moderationReason: row.status === 'published' ? null : row.moderationReason,
+      review: reviews.get(row.id) ?? null,
     });
   }
   return { items, total };
@@ -190,15 +194,23 @@ const organizerColumns = {
   user: { id: users.id, name: users.name, avatarUrl: users.avatarUrl, about: users.about },
 };
 
-function toOrganizerRegistration(row: {
+type OrganizerRow = {
   id: string;
   status: RegistrationStatus;
   message: string | null;
   createdAt: Date;
   decidedAt: Date | null;
-  user: OrganizerRegistration['user'];
-}): OrganizerRegistration {
-  return { id: row.id, ...toMyRegistration(row), user: row.user };
+  user: Omit<OrganizerRegistration['user'], 'reliability'>;
+};
+
+/** Записи с надёжностью каждого человека: организатор видит её, решая по заявке. */
+async function toOrganizerRegistrations(rows: OrganizerRow[]): Promise<OrganizerRegistration[]> {
+  const summaries = await participantSummaries([...new Set(rows.map((row) => row.user.id))]);
+  return rows.map((row) => ({
+    id: row.id,
+    ...toMyRegistration(row),
+    user: { ...row.user, reliability: summaries.get(row.user.id)! },
+  }));
 }
 
 /** Записи события для его автора: сначала ожидающие решения, затем самые свежие. */
@@ -241,7 +253,7 @@ export async function listRegistrationsForAuthor(
     number
   >;
   for (const { status, value } of totals) counts[status] = value;
-  return { items: rows.map(toOrganizerRegistration), counts, capacity: event.capacity };
+  return { items: await toOrganizerRegistrations(rows), counts, capacity: event.capacity };
 }
 
 /** Принять или отклонить заявку. Решает только автор события и только ожидающую заявку. */
@@ -249,7 +261,7 @@ export async function decideRegistration(
   executor: Db,
   args: { eventId: string; registrationId: string; actorId: string; decision: Decision },
 ): Promise<OrganizerRegistration> {
-  return executor.transaction(async (tx) => {
+  const decided = await executor.transaction(async (tx) => {
     const event = await lockEvent(tx, args.eventId);
     // Автора проверяем раньше заявки: чужой не узнает, есть ли такая заявка.
     if (event.createdBy !== args.actorId) throw notAuthor();
@@ -293,6 +305,8 @@ export async function decideRegistration(
       .from(registrations)
       .innerJoin(users, eq(users.id, registrations.userId))
       .where(eq(registrations.id, registration.id));
-    return toOrganizerRegistration(row);
+    return row;
   });
+  const [item] = await toOrganizerRegistrations([decided]);
+  return item!;
 }

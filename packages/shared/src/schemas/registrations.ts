@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import { REGISTRATION_STATUSES, type EventStatus, type RegistrationStatus } from '../enums';
 import type { EventListItem } from './events';
+import type { ParticipantSummary, ReviewState } from './reviews';
 
 export const REGISTRATION_MESSAGE_MAX = 500;
 
@@ -36,6 +37,8 @@ export type MyRegistrationItem = EventListItem & {
   myRegistration: NonNullable<EventListItem['myRegistration']>;
   status: EventStatus;
   moderationReason: string | null;
+  /** Только у прошедших встреч, где я был подтверждённым участником. */
+  review: ReviewState | null;
 };
 
 // ---------- Панель организатора (участник 2 вызывает сервис напрямую) ----------
@@ -56,7 +59,14 @@ export type OrganizerRegistration = {
   message: string | null;
   createdAt: string;
   decidedAt: string | null;
-  user: { id: string; name: string; avatarUrl: string | null; about: string | null };
+  user: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    about: string | null;
+    /** Надёжность и оценка по прошлым встречам: помогает решить по заявке. */
+    reliability: ParticipantSummary;
+  };
 };
 
 export type OrganizerRegistrations = {

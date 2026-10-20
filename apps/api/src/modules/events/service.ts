@@ -17,6 +17,7 @@ import { db } from '../../db/client';
 import { events, registrations, sports, users } from '../../db/schema';
 import { AppError, errors } from '../../lib/errors';
 import type { SessionUser } from '../auth/session';
+import { attendanceStates, organizerSummary } from '../reviews/service';
 import { resolveSport } from '../sports/service';
 import { findVenue, publishingOrganizationId, resolveVenueForEvent } from './external';
 import { confirmedCount, feedConditions, selectEvents, toListItem } from './queries';
@@ -99,7 +100,7 @@ export async function getEventDetails(id: string, viewer: Viewer): Promise<Event
   if (!canSeeEvent(row, viewer, myStatus)) throw eventHidden();
 
   const now = new Date();
-  const [[texts], participants, venue] = await Promise.all([
+  const [[texts], participants, venue, organizerRating] = await Promise.all([
     db
       .select({
         description: events.description,
@@ -118,6 +119,12 @@ export async function getEventDetails(id: string, viewer: Viewer): Promise<Event
           .orderBy(asc(registrations.createdAt))
       : null,
     row.venueId ? findVenue(row.venueId) : null,
+    organizerSummary(
+      row.organizationId
+        ? { type: 'organization', id: row.organizationId }
+        : { type: 'user', id: row.createdBy },
+      now,
+    ),
   ]);
   const denial = joinDenial(row, viewer, myStatus, row.participantsCount, now);
 
@@ -134,6 +141,7 @@ export async function getEventDetails(id: string, viewer: Viewer): Promise<Event
     participants,
     permissions: eventPermissions(row, viewer, myStatus, row.participantsCount, now),
     joinBlock: denial && { code: denial.code, message: denial.message },
+    organizerRating,
   };
 }
 
@@ -174,12 +182,14 @@ export async function listMyEvents(
         .groupBy(registrations.eventId)
     : [];
   const pendingById = new Map(counts.map((c) => [c.id, c.pending]));
+  const attendance = upcoming ? new Map() : await attendanceStates(rows, now);
   return {
     items: rows.map((row) => ({
       ...toListItem(row),
       status: row.status,
       moderationReason: row.status === 'published' ? null : row.moderationReason,
       pendingCount: pendingById.get(row.id) ?? 0,
+      attendance: attendance.get(row.id) ?? null,
     })),
     total,
   };
