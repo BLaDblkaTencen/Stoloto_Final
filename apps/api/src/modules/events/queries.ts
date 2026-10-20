@@ -1,11 +1,7 @@
 // Выборка мероприятий для ленты, карточки и «Моих мероприятий» и превращение строки в ответ API.
 // Одна выборка на все экраны: организатор, вид спорта, число участников и моя запись считаются
 // одинаково, поэтому лента и карточка не расходятся.
-import {
-  EVENT_TIMEZONE,
-  type EventListItem,
-  type EventListQuery,
-} from '@sport/shared/schemas/events';
+import type { EventListItem, EventListQuery } from '@sport/shared/schemas/events';
 import { and, eq, gt, gte, ilike, inArray, lte, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { db } from '../../db/client';
@@ -70,10 +66,10 @@ export function selectEvents(viewerId: string | null) {
 /** Строка выборки с полями ленты; поля присоединённых слева таблиц Drizzle делает nullable сам. */
 export type ListRow = Awaited<ReturnType<typeof selectEvents>>[number];
 
-/** Начало дня по Красноярску: границы фильтра по дате не зависят от пояса сервера. */
-const dayStart = (day: string) => sql`(${day}::date::timestamp at time zone ${EVENT_TIMEZONE})`;
-const nextDayStart = (day: string) =>
-  sql`((${day}::date + 1)::timestamp at time zone ${EVENT_TIMEZONE})`;
+/** Начало дня в поясе человека (tz): границы фильтра по дате не зависят от пояса сервера. */
+const dayStart = (day: string, tz: string) => sql`(${day}::date::timestamp at time zone ${tz})`;
+const nextDayStart = (day: string, tz: string) =>
+  sql`((${day}::date + 1)::timestamp at time zone ${tz})`;
 
 /** Условия ленты: только опубликованные и фильтры из запроса. */
 export function feedConditions(query: EventListQuery, now: Date): SQL | undefined {
@@ -107,8 +103,12 @@ export function feedConditions(query: EventListQuery, now: Date): SQL | undefine
   }
   if (query.sportId?.length) conditions.push(inArray(events.sportId, query.sportId));
   if (query.organizationId) conditions.push(eq(events.organizationId, query.organizationId));
-  if (query.dateFrom) conditions.push(sql`${events.startsAt} >= ${dayStart(query.dateFrom)}`);
-  if (query.dateTo) conditions.push(sql`${events.startsAt} < ${nextDayStart(query.dateTo)}`);
+  if (query.dateFrom) {
+    conditions.push(sql`${events.startsAt} >= ${dayStart(query.dateFrom, query.tz)}`);
+  }
+  if (query.dateTo) {
+    conditions.push(sql`${events.startsAt} < ${nextDayStart(query.dateTo, query.tz)}`);
+  }
   if (query.joinMode) conditions.push(eq(events.joinMode, query.joinMode));
   if (query.level) conditions.push(eq(events.level, query.level));
   if (query.bbox) {

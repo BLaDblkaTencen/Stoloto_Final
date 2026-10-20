@@ -47,6 +47,8 @@ export type EventsMapFilters = {
   date?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** Пояс устройства для границ дня в date, dateFrom и dateTo. */
+  tz?: string;
 };
 
 /**

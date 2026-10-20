@@ -39,6 +39,8 @@ export type FeedParams = {
   sportId?: string;
   dateFrom?: string;
   dateTo?: string;
+  /** Пояс устройства: в нём сервер считает границы дня для dateFrom и dateTo. */
+  tz?: string;
   joinMode?: 'free' | 'request';
   level?: 'any' | 'beginner' | 'amateur' | 'pro';
 };

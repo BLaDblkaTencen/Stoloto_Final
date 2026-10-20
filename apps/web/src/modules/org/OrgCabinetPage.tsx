@@ -1,7 +1,6 @@
 // Кабинет организации (задачи 2.2, 2.3): подача заявки, сводка «допуск · оценка · встречи»,
 // анкета и отзывы участников, правка данных и повторная подача после отказа.
 import type { OrgStatus } from '@sport/shared';
-import { EVENT_TIMEZONE } from '@sport/shared/schemas/events';
 import type { OrganizationOwner } from '@sport/shared/schemas/organizations';
 import {
   RATING_MIN_REVIEWS,
@@ -163,7 +162,6 @@ function Cabinet({ org }: { org: OrganizationOwner }) {
 }
 
 const dayMonthFormat = new Intl.DateTimeFormat('ru-RU', {
-  timeZone: EVENT_TIMEZONE,
   day: 'numeric',
   month: 'long',
 });

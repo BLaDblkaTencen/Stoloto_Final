@@ -1,25 +1,25 @@
-// Даты и числа для экранов зоны «Пользователь». Время всегда показываем в поясе города
-// мероприятий (EVENT_TIMEZONE), а не браузера: эксперт из Москвы видит то же время, что и организатор.
-import { EVENT_TIMEZONE } from '@sport/shared/schemas/events';
+// Даты и числа для экранов зоны «Пользователь». Время показываем в поясе устройства (решение
+// капитана): в Москве встреча в 19:00 по Красноярску видна как 15:00, в Красноярске — как 19:00.
+// Пояс браузер берёт при загрузке страницы: после перелёта время обновится, когда её перезагрузят.
 
 const dayFormat = new Intl.DateTimeFormat('ru-RU', {
-  timeZone: EVENT_TIMEZONE,
   weekday: 'short',
   day: 'numeric',
   month: 'long',
 });
 const timeFormat = new Intl.DateTimeFormat('ru-RU', {
-  timeZone: EVENT_TIMEZONE,
   hour: '2-digit',
   minute: '2-digit',
 });
 // en-CA даёт ГГГГ-ММ-ДД — формат параметра date в API.
 const isoDayFormat = new Intl.DateTimeFormat('en-CA', {
-  timeZone: EVENT_TIMEZONE,
   year: 'numeric',
   month: '2-digit',
   day: '2-digit',
 });
+
+/** Пояс устройства («Europe/Moscow»): в нём сервер считает границы дня в фильтре ленты. */
+export const DEVICE_TIMEZONE = new Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -37,7 +37,6 @@ export function formatWhen(startsAt: string, endsAt: string | null) {
 }
 
 const shortDayFormat = new Intl.DateTimeFormat('ru-RU', {
-  timeZone: EVENT_TIMEZONE,
   weekday: 'short',
   day: 'numeric',
   month: 'short',
@@ -51,12 +50,11 @@ export function formatShort(startsAt: string) {
 
 /** День «2026-10-24» → «Сб, 24 окт.» — подпись кнопки дня в форме. */
 export function formatDayLabel(day: string) {
-  // Полдень по Красноярску: в любом поясе браузера это тот же календарный день.
-  return capitalize(shortDayFormat.format(new Date(`${day}T12:00:00+07:00`)));
+  // Местный полдень: без пояса в строке Date читает её во времени устройства.
+  return capitalize(shortDayFormat.format(new Date(`${day}T12:00:00`)));
 }
 
 const monthYearFormat = new Intl.DateTimeFormat('ru-RU', {
-  timeZone: EVENT_TIMEZONE,
   day: 'numeric',
   month: 'long',
   year: 'numeric',
@@ -76,17 +74,29 @@ export function formatMoment(value: string) {
   return `${dayFormat.format(date).replace(/^\S+,\s*/, '')}, ${timeFormat.format(date)}`;
 }
 
-export const LOCAL_TIME_NOTE = 'Время местное, по Красноярску';
-
-/** Сегодняшняя дата в поясе мероприятий, со сдвигом на days дней: «2026-10-26». */
-export function isoDay(days = 0, from = new Date()) {
-  return isoDayFormat.format(new Date(from.getTime() + days * 86_400_000));
+/** «UTC+7» — смещение пояса устройства сейчас, для подписи к времени. */
+function deviceOffset() {
+  const name = new Intl.DateTimeFormat('en-US', { timeZoneName: 'shortOffset' })
+    .formatToParts(new Date())
+    .find((part) => part.type === 'timeZoneName')?.value;
+  return name ? name.replace('GMT', 'UTC') : null;
 }
 
-/** «08:00» — время начала по Красноярску. */
+const offset = deviceOffset();
+export const LOCAL_TIME_NOTE = `Время по часовому поясу вашего устройства${offset ? `, ${offset}` : ''}`;
+
+/** Сегодняшняя дата на устройстве, со сдвигом на days дней: «2026-10-26». */
+export function isoDay(days = 0, from = new Date()) {
+  // Календарные дни, а не по 24 часа: при переходе на летнее время сутки бывают 23 или 25 часов.
+  const date = new Date(from);
+  date.setDate(date.getDate() + days);
+  return isoDayFormat.format(date);
+}
+
+/** «08:00» — время начала на устройстве. */
 export const formatTime = (iso: string) => timeFormat.format(new Date(iso));
 
-/** День встречи по Красноярску: «2026-10-26» — ключ для группировки ленты по дням. */
+/** День встречи на устройстве: «2026-10-26» — ключ для группировки ленты по дням. */
 export const eventDay = (iso: string) => isoDayFormat.format(new Date(iso));
 
 /** «Сегодня», «Завтра» или «Сб, 24 окт.» — заголовок дня в ленте. */
@@ -114,25 +124,21 @@ export function formatSeats(participants: number, capacity: number | null) {
     : `Участвуют ${participants} из ${capacity}, свободно ${plural(free, ['место', 'места', 'мест'])}`;
 }
 
-// Красноярск живёт по UTC+7 круглый год (переходов на летнее время нет с 2014 года),
-// поэтому смещение постоянное и дату с временем из формы можно перевести в UTC без библиотек.
-const EVENT_UTC_OFFSET = '+07:00';
-
-/** Дата и время из полей формы (по Красноярску) → ISO в UTC для API; '' — если поле пустое. */
+/** Дата и время из полей формы (на устройстве) → ISO в UTC для API; '' — если поле пустое. */
 export function toUtcIso(date: string, time: string) {
   if (!date || !time) return '';
-  const value = new Date(`${date}T${time}:00${EVENT_UTC_OFFSET}`);
+  // Без пояса в строке Date читает её во времени устройства, с учётом летнего времени.
+  const value = new Date(`${date}T${time}:00`);
   return Number.isNaN(value.getTime()) ? '' : value.toISOString();
 }
 
 const timeOfDayFormat = new Intl.DateTimeFormat('en-GB', {
-  timeZone: EVENT_TIMEZONE,
   hour: '2-digit',
   minute: '2-digit',
   hourCycle: 'h23',
 });
 
-/** ISO из API → поля формы: { date: '2026-10-26', time: '19:00' } по Красноярску. */
+/** ISO из API → поля формы: { date: '2026-10-26', time: '19:00' } на устройстве. */
 export function localParts(iso: string) {
   const date = new Date(iso);
   return { date: isoDayFormat.format(date), time: timeOfDayFormat.format(date) };
