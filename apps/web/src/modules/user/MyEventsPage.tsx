@@ -13,7 +13,6 @@ import {
   Chip,
   EmptyState,
   ErrorState,
-  Icon,
   SkeletonList,
   StatusBadge,
 } from '../../shared/ui';
@@ -66,15 +65,10 @@ function MyEventsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-h2 mb-2">Мои мероприятия</h1>
-          <p className="text-ink-muted">{LOCAL_TIME_NOTE}</p>
-        </div>
-        <ButtonLink to="/events/new">
-          <Icon name="plus" />
-          Создать встречу
-        </ButtonLink>
+      {/* «Создать встречу» — в шапке на всех страницах, здесь второй кнопки не нужно. */}
+      <div>
+        <h1 className="text-h2 mb-2">Мои мероприятия</h1>
+        <p className="text-ink-muted">{LOCAL_TIME_NOTE}</p>
       </div>
 
       <div className="flex flex-wrap gap-6">
