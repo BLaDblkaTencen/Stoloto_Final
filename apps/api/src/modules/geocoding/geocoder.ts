@@ -1,7 +1,7 @@
-// Поиск адреса для «Места встречи»: адрес → точка на карте и точка → адрес. Владелец: участник 2.
+// Поиск адреса для «Места встречи»: вписанный адрес → точка на карте. Владелец: участник 2.
 // Источник — OpenStreetMap Nominatim. По его правилам (operations.osmfoundation.org/policies/nominatim)
 // не чаще запроса в секунду, с понятным User-Agent и без подсказок на каждую букву: поэтому
-// запросы идут по одному в очереди, ответы кэшируются, а форма ищет по кнопке или при уходе из поля.
+// запросы идут по одному в очереди, ответы кэшируются, а форма ищет после паузы в наборе или по Enter.
 import type { GeocodePlace } from '@sport/shared/schemas/geocoding';
 import { env } from '../../env';
 import { AppError } from '../../lib/errors';
@@ -217,16 +217,6 @@ export function createGeocoder({
         if (found.length > 0) return uniquePlaces(found.map(toPlace));
       }
       return [];
-    },
-
-    /** Ближайший адрес к точке; null — рядом ничего (Nominatim отвечает { error }). */
-    async reverse(lat: number, lng: number): Promise<GeocodePlace | null> {
-      const found = await request<NominatimPlace | { error: string }>('/reverse', {
-        lat: String(lat),
-        lon: String(lng),
-        zoom: '18',
-      });
-      return 'error' in found ? null : { ...toPlace(found), lat, lng };
     },
   };
 }

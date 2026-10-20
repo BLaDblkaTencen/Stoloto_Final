@@ -27,6 +27,8 @@ export type MapPickerProps = {
   sportId?: string;
   value: PlaceValue;
   onChange: (value: PlaceValue) => void;
+  /** Адрес из поля формы: подпись над своей точкой на карте. */
+  address?: string;
   /** Ошибка поля venueId или координат от сервера. */
   error?: string;
 };
@@ -34,7 +36,7 @@ export type MapPickerProps = {
 const PickerMap = lazy(() => import('./PickerMap'));
 const MAP_HEIGHT = 'h-[420px] md:h-[520px]';
 
-export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
+export function MapPicker({ sportId, value, onChange, address = '', error }: MapPickerProps) {
   const venues = useVenues(sportId);
   const items = venues.data ?? [];
   const hasHint = sportId !== undefined && items.some((venue) => venue.suitable === false);
@@ -48,13 +50,14 @@ export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
           ? 'Жёлтые метки — площадки, подходящие для этого вида спорта, серые — остальные. '
           : 'Метки — площадки, где можно договориться о встрече. '}
         Нажмите на метку, чтобы выбрать площадку, или на свободное место карты, чтобы поставить свою
-        точку (двор, парк). Адрес, найденный выше, тоже появится здесь точкой.
+        точку (двор, парк). Адрес, который вы вписали выше, появится здесь точкой.
       </p>
 
       <MapBoundary className={MAP_HEIGHT}>
         <PickerMap
           venues={items}
           value={value}
+          address={address}
           onPickVenue={pickVenue}
           onPickPoint={(lat, lng) => onChange({ kind: 'point', lat, lng })}
         />
@@ -94,15 +97,12 @@ export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
       )}
       {value?.kind === 'point' && (
         <div className="flex flex-col gap-3 rounded-lg border-2 border-ink bg-surface p-5">
-          <p className="font-semibold">
-            {value.found ? `Точка по адресу: ${value.found.label}` : 'Своя точка на карте'}
-          </p>
+          <p className="font-semibold">Своя точка на карте</p>
           <p className="text-ink-muted">
             {value.found
-              ? 'Если точка стоит не там, нажмите на карту, где вы встречаетесь: она переместится. '
-              : ''}
-            Уточните место в поле «Как найти», чтобы участники точно нашли вас: например «у главного
-            входа в парк, возле фонтана».
+              ? 'Поставили по адресу. Не там — нажмите на карту, где вы встречаетесь. '
+              : 'Стоит там, где вы нажали на карту. '}
+            Ориентир можно добавить в поле «Как найти»: например «у главного входа, возле фонтана».
           </p>
           <Button variant="secondary" className="self-start" onClick={() => onChange(null)}>
             Убрать точку

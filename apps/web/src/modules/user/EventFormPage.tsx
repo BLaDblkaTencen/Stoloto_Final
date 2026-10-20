@@ -408,7 +408,7 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
         </div>
         <div className="flex min-w-0 flex-col gap-6 max-lg:contents">
           <Section title="Где?" className="max-lg:order-3">
-            {/* Адрес над картой: вписали — точка появляется на карте ниже (участник 2). */}
+            {/* Адрес над картой: вписали — он появляется точкой с подписью на карте ниже (участник 2). */}
             <AddressField
               hint={
                 form.place?.kind === 'venue'
@@ -426,6 +426,7 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
               sportId={form.sportId && form.sportId !== CUSTOM_SPORT ? form.sportId : undefined}
               value={form.place}
               onChange={choosePlace}
+              address={form.address}
               error={errors.venueId ?? errors.lat}
             />
             <TextField

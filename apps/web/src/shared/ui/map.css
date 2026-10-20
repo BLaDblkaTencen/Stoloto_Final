@@ -32,7 +32,11 @@
   color: revert-layer;
 }
 
-/* Метки (pinIcon в map.ts). Позицию задаёт Leaflet, здесь только вид. */
+/*
+ * Метки (pinIcon в map.ts). Позицию задаёт Leaflet, здесь только вид.
+ * Без жёсткой тени, как у карточек: на карте тень сдвигает метку зрительно и мешает понять,
+ * где точно место. Выбранную выделяет обводка.
+ */
 .pin {
   position: relative;
   box-sizing: border-box;
@@ -43,20 +47,35 @@
   height: 100%;
   border: var(--border);
   border-radius: 50%;
-  box-shadow: var(--shadow-sm);
   color: var(--color-ink);
   cursor: pointer;
-  transition: box-shadow 0.15s;
 }
 .pin.is-selected {
-  box-shadow: var(--shadow-md);
   outline: 3px solid var(--color-ink);
   outline-offset: 2px;
 }
 .pin.is-muted {
   border-color: var(--color-line-soft);
-  box-shadow: none;
   color: var(--color-ink-muted);
+}
+
+/* Подпись над своей точкой в форме встречи: вписанный адрес (PickerMap). Без тени, как метки. */
+.map-frame .leaflet-tooltip.map-label {
+  width: max-content;
+  max-width: 260px;
+  padding: 4px 10px;
+  border: var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-size: var(--text-base);
+  font-weight: 600;
+  line-height: 1.35;
+  white-space: normal;
+}
+.map-frame .leaflet-tooltip-top.map-label::before {
+  border-top-color: var(--color-ink);
 }
 /*
  * --pin-k — масштаб метки (pinScale в map.ts): вблизи замок меньше вместе с меткой,

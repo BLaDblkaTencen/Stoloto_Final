@@ -193,29 +193,4 @@ describe('createGeocoder', () => {
     await expect(geocoder.search('Покровский парк')).rejects.toMatchObject({ status: 503 });
     expect(send).not.toHaveBeenCalled();
   });
-
-  it('адрес по точке: подпись места и та же точка; пусто — null', async () => {
-    const geocoder = createGeocoder({
-      baseUrl: 'https://n.test',
-      fetch: async (url) =>
-        json(
-          new URL(String(url)).searchParams.get('lat') === '56.01'
-            ? {
-                lat: '56.0101',
-                lon: '92.8501',
-                address: { road: 'улица Весны', house_number: '23' },
-              }
-            : { error: 'Unable to geocode' },
-        ),
-      minIntervalMs: 0,
-    });
-
-    expect(await geocoder.reverse(56.01, 92.85)).toEqual({
-      label: 'улица Весны, 23',
-      context: null,
-      lat: 56.01,
-      lng: 92.85,
-    });
-    expect(await geocoder.reverse(0, 0)).toBeNull();
-  });
 });

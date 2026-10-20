@@ -2,7 +2,7 @@
 // Ленивая часть MapPicker: всё, что требует Leaflet.
 import type { Venue } from '@sport/shared/schemas/venues';
 import { useEffect, useState } from 'react';
-import { Marker, useMap, useMapEvents } from 'react-leaflet';
+import { Marker, Tooltip, useMap, useMapEvents } from 'react-leaflet';
 import { pinIcon, venuePin } from '../../../shared/ui';
 import { BaseMap, cachedIcon, PinScaleWatcher } from './BaseMap';
 import type { PlaceValue } from './MapPicker';
@@ -10,11 +10,14 @@ import type { PlaceValue } from './MapPicker';
 export type PickerMapProps = {
   venues: Venue[];
   value: PlaceValue;
+  /** Адрес из поля формы: подпись над своей точкой, чтобы было видно, что вписано и где оно. */
+  address: string;
   onPickVenue: (venue: Venue) => void;
   onPickPoint: (lat: number, lng: number) => void;
 };
 
-export function PickerMap({ venues, value, onPickVenue, onPickPoint }: PickerMapProps) {
+export function PickerMap({ venues, value, address, onPickVenue, onPickPoint }: PickerMapProps) {
+  const label = address.trim();
   const selectedId = value?.kind === 'venue' ? value.venue.id : null;
   const [scale, setScale] = useState(1);
   return (
@@ -46,11 +49,20 @@ export function PickerMap({ venues, value, onPickVenue, onPickPoint }: PickerMap
           icon={cachedIcon(`point:${scale}`, () =>
             pinIcon({ icon: 'pin', color: 'var(--color-accent)', selected: true, scale }),
           )}
-        />
+        >
+          {label && (
+            <Tooltip permanent direction="top" className="map-label">
+              {label.length > LABEL_MAX ? `${label.slice(0, LABEL_MAX - 1)}…` : label}
+            </Tooltip>
+          )}
+        </Marker>
       )}
     </BaseMap>
   );
 }
+
+/** Длинный адрес в подписи над точкой обрезаем: целиком он виден в поле формы. */
+const LABEL_MAX = 80;
 
 /** Нажатие на свободное место карты ставит свою точку (метки площадок нажатие не пропускают). */
 function PointPicker({ onPick }: { onPick: (lat: number, lng: number) => void }) {

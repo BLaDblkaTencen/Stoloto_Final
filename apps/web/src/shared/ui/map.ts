@@ -73,6 +73,8 @@ export function pinIcon({
     iconSize: [size, size] as [number, number],
     iconAnchor: [size / 2, size / 2] as [number, number],
     popupAnchor: [0, -size / 2] as [number, number],
+    // Подпись над меткой (Tooltip direction="top") — от её верхнего края, а не от центра.
+    tooltipAnchor: [0, -size / 2] as [number, number],
   };
 }
 

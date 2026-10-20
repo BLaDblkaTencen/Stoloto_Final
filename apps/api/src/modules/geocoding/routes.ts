@@ -1,13 +1,8 @@
 // Модуль geocoding. Владелец: участник 2.
-// Поиск адреса для формы встречи: адрес → точка на карте, точка → адрес. Контракт —
+// Поиск адреса для формы встречи: вписанный адрес → точка на карте. Контракт —
 // docs/api/organizations.md, раздел «Поиск адреса». Только для вошедших: форма встречи требует входа,
 // а внешний сервис нельзя отдавать анонимному трафику.
-import {
-  geocodeQuery,
-  reverseGeocodeQuery,
-  type GeocodeResponse,
-  type ReverseGeocodeResponse,
-} from '@sport/shared/schemas/geocoding';
+import { geocodeQuery, type GeocodeResponse } from '@sport/shared/schemas/geocoding';
 import type { FastifyPluginAsync } from 'fastify';
 import { parse } from '../../lib/errors';
 import { requireAuth } from '../auth/guards';
@@ -25,16 +20,6 @@ const routes: FastifyPluginAsync = async (app) => {
     async (request, reply) => {
       const { q } = parse(geocodeQuery, request.query);
       const body: GeocodeResponse = { items: await geocoder.search(q) };
-      return reply.header('cache-control', CACHE_HEADER).send(body);
-    },
-  );
-
-  app.get(
-    '/geocode/reverse',
-    { preHandler: requireAuth, config: { rateLimit } },
-    async (request, reply) => {
-      const { lat, lng } = parse(reverseGeocodeQuery, request.query);
-      const body: ReverseGeocodeResponse = { place: await geocoder.reverse(lat, lng) };
       return reply.header('cache-control', CACHE_HEADER).send(body);
     },
   );
