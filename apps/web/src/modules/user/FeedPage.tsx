@@ -1,5 +1,6 @@
-// Главная (задачи 1.4, 1.10) по макету docs/design/home.html: поиск «Чем заняться / Где / Когда»,
-// стикеры «Мои записи», чипы видов спорта, список встреч рядом с картой, «Как это работает».
+// Главная (задачи 1.4, 1.10), вариант Б2 + К1 после экспертной сессии: площадка под выбранный
+// вид спорта с поиском, ниже лента по дням рядом с картой. Режим записи и уровень — в «Фильтрах»,
+// «Мои записи» — одна ближайшая строкой, «Как это работает» — тонкой полосой внизу.
 // Фильтры живут в адресе страницы: ссылкой на подборку можно поделиться, «Назад» возвращает фильтр.
 import { EVENT_LEVEL_LABELS, EVENT_LEVELS, JOIN_MODE_LABELS, JOIN_MODES } from '@sport/shared';
 import type { EventListItem } from '@sport/shared/schemas/events';
@@ -15,9 +16,9 @@ import {
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
+  Badge,
   Button,
   ButtonLink,
-  Chip,
   EmptyState,
   ErrorState,
   Icon,
@@ -25,14 +26,23 @@ import {
   Listbox,
   SelectField,
   SkeletonList,
-  SportChip,
+  sportColor,
+  sportIcon,
   StatusBadge,
 } from '../../shared/ui';
 import { useMe } from '../auth/api';
 import { EventsMap, type MapFocus } from '../org/map';
 import { useFeed, useJoinEvent, useMyRegistrations, useSports, type FeedParams } from './api';
-import { MetaLine, SportTile } from './EventBits';
-import { formatSeats, formatShort, formatWhen, isoDay, LOCAL_TIME_NOTE, plural } from './format';
+import {
+  eventDay,
+  formatDayHeading,
+  formatShort,
+  formatTime,
+  isoDay,
+  LOCAL_TIME_NOTE,
+  plural,
+} from './format';
+import { HomeHero } from './HomeHero';
 
 const WHEN_OPTIONS = [
   { value: 'today', label: 'Сегодня' },
@@ -109,24 +119,16 @@ export function FeedPage() {
     );
   };
 
+  const sports = useSports({ withEvents: true });
+
   return (
     <div className="flex flex-col gap-8">
-      <section className="flex flex-wrap items-center gap-8">
-        <div className="flex min-w-0 flex-[999_1_560px] flex-col gap-5">
-          <h1 className="text-h1-mobile leading-tight md:text-h1">
-            Больше, чем спорт —{' '}
-            <span className="rounded-[14px] bg-accent px-3 box-decoration-clone">это люди</span>
-          </h1>
-          <p className="max-w-[620px] text-lg text-ink-muted">
-            Смотрите, кто и где собирается рядом с вами, и присоединяйтесь. Не нашли своё —{' '}
-            {me.data?.role === 'admin' ? (
-              'создайте встречу сами.'
-            ) : (
-              <>
-                <Link to="/events/new">создайте встречу сами</Link>.
-              </>
-            )}
-          </p>
+      <HomeHero
+        sports={sports.data ?? []}
+        sportId={params.sportId}
+        onSport={(id) => setParams({ sport: id })}
+        canCreate={me.data?.role !== 'admin'}
+        search={
           <SearchForm
             key={`${params.q ?? ''}|${params.place ?? ''}`}
             q={params.q ?? ''}
@@ -134,15 +136,10 @@ export function FeedPage() {
             when={when}
             onSearch={setParams}
           />
-        </div>
-        <MyRegistrations />
-      </section>
-
-      <SportFilter
-        sportId={params.sportId}
-        onChange={(id) => setParams({ sport: id })}
-        canCreate={me.data?.role !== 'admin'}
+        }
       />
+
+      <NextRegistration />
 
       <EventsSplit
         params={params}
@@ -153,8 +150,7 @@ export function FeedPage() {
         onParam={(key, value) => setParams({ [key]: value })}
       />
 
-      <Steps />
-      <OrgInvite />
+      <HowItWorks />
     </div>
   );
 }
@@ -181,7 +177,7 @@ function SearchForm({
     <form
       role="search"
       onSubmit={submit}
-      className="flex max-w-[760px] flex-col gap-2.5 rounded-[22px] border-2 border-ink bg-surface p-2.5 shadow-md"
+      className="grid w-full max-w-[860px] gap-2.5 rounded-[22px] border-2 border-ink bg-surface p-2.5 text-left shadow-md md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
     >
       <div className="grid sm:grid-cols-3">
         <SearchField label="Чем заняться">
@@ -213,7 +209,7 @@ function SearchForm({
           />
         </SearchField>
       </div>
-      <Button type="submit" size="lg" className="self-start">
+      <Button type="submit" size="lg" className="justify-self-start md:justify-self-stretch">
         <Icon name="search" />
         Найти
       </Button>
@@ -253,120 +249,30 @@ function SearchField({
   );
 }
 
-/** Стикер «Мои записи»: чуть повёрнут, как в макете; соседние — в разные стороны. */
-function Sticker({ index, children }: { index: number; children: ReactNode }) {
-  return (
-    <div
-      className="flex flex-col gap-1.5 rounded-lg border-2 border-ink bg-surface px-[18px] py-4 shadow-md"
-      style={{ rotate: index % 2 ? '1deg' : '-1.5deg' }}
-    >
-      {children}
-    </div>
-  );
-}
-
-const StickerCaption = () => (
-  <span className="text-sm font-semibold text-ink-muted">Мои записи</span>
-);
-
-/** Ближайшие записи участника: статус видно сразу на главной. Гостю — приглашение войти. */
-function MyRegistrations() {
+/** Ближайшая запись участника строкой над лентой. Гостю и без записей блока нет. */
+function NextRegistration() {
   const me = useMe();
-  const isParticipant = me.data?.role === 'user';
-  const mine = useMyRegistrations(isParticipant, 2);
-
-  let stickers: ReactNode = null;
-  if (!me.isPending && !me.data) {
-    stickers = (
-      <Sticker index={0}>
-        <StickerCaption />
-        <p>Войдите, и здесь появятся встречи, куда вы записаны, и ответы на заявки.</p>
-        <Link to="/login" className="self-start font-semibold">
-          Войти
-        </Link>
-      </Sticker>
-    );
-  } else if (isParticipant && mine.data) {
-    stickers =
-      mine.data.items.length === 0 ? (
-        <Sticker index={0}>
-          <StickerCaption />
-          <p>Вы пока никуда не записаны. Выберите встречу ниже.</p>
-        </Sticker>
-      ) : (
-        <>
-          {mine.data.items.map((item, index) => (
-            <Sticker key={item.id} index={index}>
-              {index === 0 && <StickerCaption />}
-              <div className="flex flex-wrap items-center justify-between gap-2.5 font-semibold">
-                <Link to={`/events/${item.id}`} className="min-w-0 no-underline hover:underline">
-                  {item.title} · {formatShort(item.startsAt)}
-                </Link>
-                {item.status === 'published' ? (
-                  <StatusBadge kind="registration" status={item.myRegistration.status} />
-                ) : (
-                  <StatusBadge kind="event" status={item.status} />
-                )}
-              </div>
-            </Sticker>
-          ))}
-          <Link to="/me/events" className="self-end font-semibold">
-            Все мои мероприятия →
-          </Link>
-        </>
-      );
-  }
-  if (!stickers) return null;
+  const mine = useMyRegistrations(me.data?.role === 'user', 1);
+  const next = mine.data?.items[0];
+  if (!next) return null;
   return (
-    <aside aria-label="Мои записи" className="flex min-w-0 flex-[1_1_320px] flex-col gap-3">
-      {stickers}
-    </aside>
-  );
-}
-
-/** Чипы видов спорта с ближайшими встречами и «Своё направление» — создать встречу с новым видом. */
-function SportFilter({
-  sportId,
-  onChange,
-  canCreate,
-}: {
-  sportId: string | undefined;
-  onChange: (id: string | undefined) => void;
-  canCreate: boolean;
-}) {
-  const sports = useSports({ withEvents: true });
-  if (!sports.data) return null;
-  return (
-    <section
-      aria-label="Виды спорта"
-      // На телефоне — одна строка с прокруткой: столбик чипов занимал бы пол-экрана.
-      className="-mx-6 flex gap-3 overflow-x-auto px-6 pt-1 pb-3 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0"
+    <aside
+      aria-label="Моя ближайшая запись"
+      className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border-2 border-ink bg-surface px-4 py-3 shadow-sm"
     >
-      <Chip pressed={!sportId} icon="all" onClick={() => onChange(undefined)}>
-        Все
-      </Chip>
-      {sports.data.map((sport, index) => (
-        <SportChip
-          key={sport.id}
-          sport={sport}
-          index={index + 1}
-          pressed={sport.id === sportId}
-          onClick={() => onChange(sport.id === sportId ? undefined : sport.id)}
-        />
-      ))}
-      {canCreate && (
-        <Link
-          to="/events/new?sport=custom"
-          aria-label="Своё направление: создать встречу с новым видом спорта"
-          className="inline-flex min-h-[var(--control-height)] items-center gap-2 rounded-md border-2 border-ink bg-surface pr-[18px] pl-[7px] text-sm font-semibold no-underline transition-[translate] duration-100 hover:-translate-y-px hover:text-ink"
-        >
-          <span className="inline-flex size-[34px] items-center justify-center rounded-[11px] border-2 border-ink bg-surface">
-            <Icon name="plus" size={19} />
-          </span>
-          Своё направление
-        </Link>
+      <span className="text-sm font-semibold text-ink-muted">Ваша ближайшая встреча</span>
+      <Link to={`/events/${next.id}`} className="font-semibold">
+        {next.title} · {formatShort(next.startsAt)}
+      </Link>
+      {next.status === 'published' ? (
+        <StatusBadge kind="registration" status={next.myRegistration.status} />
+      ) : (
+        <StatusBadge kind="event" status={next.status} />
       )}
-    </section>
+      <Link to="/me/events" className="ml-auto font-semibold">
+        Все мои мероприятия →
+      </Link>
+    </aside>
   );
 }
 
@@ -423,6 +329,7 @@ function EventsSplit({
             onParam={onParam}
             selectedId={selectedId}
             onShowOnMap={showOnMap}
+            onHover={setSelectedId}
           />
         )}
         {(wide || view === 'map') && (
@@ -462,6 +369,7 @@ function EventList({
   onParam,
   selectedId,
   onShowOnMap,
+  onHover,
 }: {
   params: FeedParams;
   hasFilters: boolean;
@@ -469,8 +377,13 @@ function EventList({
   onParam: (key: string, value: string | undefined) => void;
   selectedId: string | undefined;
   onShowOnMap: (event: EventListItem) => void;
+  onHover: (id: string) => void;
 }) {
   const feed = useFeed(params);
+  const activeFilters = [params.joinMode, params.level].filter(Boolean).length;
+  // Открыты сами, если фильтр уже выбран (например, пришли по ссылке с ним).
+  const [filtersOpen, setFiltersOpen] = useState(activeFilters > 0);
+  const filtersId = useId();
   const total = feed.data?.pages[0].total;
   const scroller = useRef<HTMLDivElement>(null);
   const [moreBelow, setMoreBelow] = useState(false);
@@ -515,14 +428,21 @@ function EventList({
   } else {
     body = (
       <>
-        {events.map((event) => (
-          <FeedItem
-            key={event.id}
-            event={event}
-            selected={event.id === selectedId}
-            onShowOnMap={() => onShowOnMap(event)}
-          />
-        ))}
+        {events.map((event, index) => {
+          const day = eventDay(event.startsAt);
+          const newDay = index === 0 || eventDay(events[index - 1]!.startsAt) !== day;
+          return (
+            <div key={event.id} className="flex flex-col gap-3">
+              {newDay && <DayHeading day={day} />}
+              <FeedItem
+                event={event}
+                selected={event.id === selectedId}
+                onShowOnMap={() => onShowOnMap(event)}
+                onHover={() => onHover(event.id)}
+              />
+            </div>
+          );
+        })}
         {feed.hasNextPage && (
           <Button
             variant="secondary"
@@ -542,16 +462,29 @@ function EventList({
     // и листается сам, колесом над ним; страница при этом остаётся на месте.
     <div className="relative min-w-0">
       <div className="flex flex-col gap-3 lg:absolute lg:inset-0">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="font-display text-[26px] leading-tight font-bold">Рядом с вами</h2>
-          {total !== undefined && (
-            <span className="text-sm text-ink-muted">
-              {plural(total, ['встреча', 'встречи', 'встреч'])}
-            </span>
-          )}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-h3 leading-tight">
+              Рядом с вами
+              {total !== undefined && (
+                <span className="ml-2 font-sans text-sm font-semibold text-ink-muted">
+                  {plural(total, ['встреча', 'встречи', 'встреч'])}
+                </span>
+              )}
+            </h2>
+            <p className="text-sm text-ink-muted">{LOCAL_TIME_NOTE}</p>
+          </div>
+          <Button
+            variant={filtersOpen ? 'accent' : 'secondary'}
+            aria-expanded={filtersOpen}
+            aria-controls={filtersId}
+            onClick={() => setFiltersOpen((open) => !open)}
+          >
+            <Icon name="chevronDown" size={18} className={filtersOpen ? 'rotate-180' : ''} />
+            Фильтры{activeFilters > 0 && ` · ${activeFilters}`}
+          </Button>
         </div>
-        <p className="text-sm text-ink-muted">{LOCAL_TIME_NOTE}</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div id={filtersId} hidden={!filtersOpen} className="grid grid-cols-2 gap-3">
           <SelectField
             label="Режим записи"
             placeholder="Любой"
@@ -583,53 +516,95 @@ function EventList({
   );
 }
 
-/** Карточка в списке рядом с картой: вид спорта, режим, что, когда, где, места, «На карте» и действие. */
+/** Заголовок дня в ленте: «Сегодня», «Завтра», «Сб, 24 окт.» — с чертой, как линия разметки. */
+function DayHeading({ day }: { day: string }) {
+  return (
+    <h3 className="mt-1 flex items-center gap-3 text-lg after:h-[3px] after:flex-1 after:bg-ink">
+      {formatDayHeading(day)}
+    </h3>
+  );
+}
+
+/** Места коротко: «2 из 12» при лимите, иначе сколько идёт. */
+function seatsShort(event: EventListItem) {
+  if (event.capacity !== null) return `${event.participantsCount} из ${event.capacity}`;
+  if (event.participantsCount === 0) return 'Пока никого';
+  return plural(event.participantsCount, ['участник', 'участника', 'участников']);
+}
+
+/**
+ * Карточка в списке рядом с картой: полоса в цвете вида спорта со временем, название, место,
+ * места и одно действие. Наведение подсвечивает метку на карте; значок «На карте» на телефоне
+ * переключает на карту и показывает встречу.
+ */
 function FeedItem({
   event,
   selected,
   onShowOnMap,
+  onHover,
 }: {
   event: EventListItem;
   selected: boolean;
   onShowOnMap: () => void;
+  onHover: () => void;
 }) {
-  const href = `/events/${event.id}`;
   const onMap = event.lat !== null && event.lng !== null;
   return (
     <article
       id={`feed-${event.id}`}
-      className={`flex scroll-m-2 gap-3.5 rounded-lg border-2 border-ink p-3.5 ${selected ? 'bg-accent shadow-md' : 'bg-surface shadow-sm'}`}
+      onMouseEnter={onHover}
+      className={`scroll-m-2 overflow-hidden rounded-lg border-2 border-ink bg-surface ${selected ? 'shadow-md outline-3 outline-offset-1 outline-accent' : 'shadow-sm'}`}
     >
-      {/* Содержание — как в карточке профиля: вид спорта и режим, название, когда, где, места. */}
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="flex items-center gap-2 font-semibold">
-            <SportTile sport={event.sport} size={32} />
-            {event.sport.name}
-          </span>
-          <JoinModeBadge mode={event.joinMode} />
-        </div>
-        <h3 className="mt-1 text-[19px] leading-snug">
-          <Link to={href} className="no-underline hover:underline">
+      <div
+        className="flex items-center justify-between gap-3 border-b-2 border-ink px-3.5 py-1.5 font-semibold"
+        style={{ background: sportColor(event.sport.slug) }}
+      >
+        <span className="flex min-w-0 items-center gap-2">
+          <Icon name={sportIcon(event.sport.slug)} size={18} />
+          <span className="truncate">{event.sport.name}</span>
+        </span>
+        <span className="font-display text-[17px] tabular-nums">{formatTime(event.startsAt)}</span>
+      </div>
+      <div className="flex flex-col gap-1 p-3.5">
+        <h3 className="font-sans text-[19px] leading-snug font-semibold">
+          <Link to={`/events/${event.id}`} className="no-underline hover:underline">
             {event.title}
           </Link>
         </h3>
-        <MetaLine icon="calendar">{formatWhen(event.startsAt, event.endsAt)}</MetaLine>
-        <MetaLine icon="pin">{event.address}</MetaLine>
-        <MetaLine icon="people">{formatSeats(event.participantsCount, event.capacity)}</MetaLine>
+        {/* Где и кто собирает — клуб или человек: по нему решают, идти ли, и находят встречи
+            клуба. Одной строкой, если помещается: карточка остаётся низкой. */}
+        <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink-muted">
+          <span className="flex items-start gap-1.5">
+            <Icon name="pin" size={16} className="mt-0.5" />
+            {event.address}
+          </span>
+          <span className="flex items-start gap-1.5">
+            <Icon name="people" size={16} className="mt-0.5" />
+            <span>
+              Организатор: <span className="font-semibold text-ink">{event.organizer.name}</span>
+            </span>
+          </span>
+        </p>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-          {onMap ? (
-            <Button
-              variant="secondary"
-              onClick={onShowOnMap}
-              aria-label={`${event.title} на карте`}
-            >
-              <Icon name="pin" size={16} />
-              На карте
-            </Button>
-          ) : (
-            <span />
-          )}
+          <span className="flex items-center gap-2">
+            {event.joinMode === 'request' ? (
+              <JoinModeBadge mode="request" />
+            ) : (
+              <Badge tone="free" icon="people">
+                {seatsShort(event)}
+              </Badge>
+            )}
+            {onMap && (
+              <Button
+                variant="secondary"
+                onClick={onShowOnMap}
+                aria-label={`${event.title} на карте`}
+                className="px-3"
+              >
+                <Icon name="pin" size={18} />
+              </Button>
+            )}
+          </span>
           <FeedAction event={event} />
         </div>
       </div>
@@ -711,70 +686,40 @@ function FeedAction({ event }: { event: EventListItem }) {
 }
 
 const STEPS = [
-  {
-    color: 'var(--sport-1)',
-    title: 'Выберите занятие',
-    text: 'Из списка или своё — даже самое редкое.',
-  },
-  {
-    color: 'var(--sport-3)',
-    title: 'Найдите на карте',
-    text: 'Встречи рядом, условия и организатор — в одном окне.',
-  },
-  {
-    color: 'var(--sport-2)',
-    title: 'Присоединяйтесь',
-    text: 'Сразу или по заявке — статус всегда в «Моих мероприятиях».',
-  },
+  { color: 'var(--sport-1)', title: 'Выберите занятие' },
+  { color: 'var(--sport-3)', title: 'Найдите встречу на карте' },
+  { color: 'var(--sport-2)', title: 'Присоединяйтесь сразу или по заявке' },
 ];
 
-/** «Как это работает»: отдельный раздел — двойной отступ от карты и видимый заголовок. */
-function Steps() {
-  const headingId = useId();
-  return (
-    <section aria-labelledby={headingId} className="mt-8 flex flex-col gap-5">
-      <h2 id={headingId} className="text-h2">
-        Как это работает
-      </h2>
-      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
-        {STEPS.map((step, index) => (
-          <div
-            key={step.title}
-            className="flex flex-col gap-2 rounded-lg border-2 border-ink bg-surface p-6"
-          >
-            <span
-              aria-hidden="true"
-              className="inline-flex size-12 items-center justify-center rounded-full border-2 border-ink font-display text-[22px] font-bold"
-              style={{ background: step.color }}
-            >
-              {index + 1}
-            </span>
-            <h3 className="text-h3">{step.title}</h3>
-            <p className="text-ink-muted">{step.text}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/** «Клуб или сообщество?» — гостю регистрация организации, организации — её кабинет. */
-function OrgInvite() {
+/** Тонкая полоса внизу: три шага для гостя и ссылка для клубов. Вошедшему участнику не нужна. */
+function HowItWorks() {
   const me = useMe();
   const role = me.data?.role;
-  if (me.isPending || (role && role !== 'organization')) return null;
+  if (me.isPending || role === 'user' || role === 'admin') return null;
   return (
-    <section className="mb-6 flex flex-wrap items-center justify-between gap-6 rounded-xl border-2 border-ink bg-status-request p-6 shadow-lg md:p-9">
-      <div className="min-w-0 flex-[1_1_440px]">
-        <h2 className="text-h2 mb-2">Клуб или сообщество?</h2>
-        <p className="text-lg">
-          Заведите страницу организации. После одобрения администратором ваши встречи сразу появятся
-          на карте.
-        </p>
-      </div>
-      <ButtonLink to={role ? '/org' : '/register'} variant="secondary" size="lg">
-        {role ? 'Кабинет организации' : 'Подать заявку'}
-      </ButtonLink>
+    <section
+      aria-label="Как это работает"
+      className="mb-6 flex flex-wrap items-center justify-between gap-x-8 gap-y-4 rounded-lg border-2 border-ink bg-surface px-5 py-4"
+    >
+      {!role && (
+        <ol className="flex flex-wrap gap-x-6 gap-y-2">
+          {STEPS.map((step, index) => (
+            <li key={step.title} className="flex items-center gap-2.5 font-semibold">
+              <span
+                aria-hidden="true"
+                className="inline-flex size-9 items-center justify-center rounded-full border-2 border-ink font-display text-base"
+                style={{ background: step.color }}
+              >
+                {index + 1}
+              </span>
+              {step.title}
+            </li>
+          ))}
+        </ol>
+      )}
+      <Link to={role ? '/org' : '/register'} className="font-semibold">
+        {role ? 'Кабинет организации →' : 'Клуб или сообщество? Заведите страницу →'}
+      </Link>
     </section>
   );
 }

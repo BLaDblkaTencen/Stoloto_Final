@@ -44,6 +44,7 @@
   --color-status-free: var(--status-free);
   --color-status-request: var(--status-request);
   --font-display: var(--font-display);
+  --font-logo: var(--font-logo);
   --font-sans: var(--font-body);
 }
 

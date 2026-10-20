@@ -35,11 +35,12 @@ import {
 import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { formErrors, useFreshErrors } from '../org/errors';
-import { useMyRegistrations, useProfile, useSports, useUpdateProfile } from './api';
+import { useMyRegistrations, useProfile, useSports, useUpdateProfile, useUserReviews } from './api';
 import { MetaLine } from './EventBits';
 import { sportTileClass } from './EventFormParts';
 import { formatSeats, formatSince, formatWhen } from './format';
 import { ProfileReviews } from './reviews/ReviewList';
+import { SportSurface, surfaceFor } from './surface/SportSurface';
 
 export function ProfilePage() {
   const { id = '' } = useParams();
@@ -96,6 +97,7 @@ type Tab = 'organizes' | 'joins' | 'reviews' | 'interests';
 function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean }) {
   const [tab, setTab] = useState<Tab>('organizes');
   const mine = useMyRegistrations(isMe, 20);
+  const reviews = useUserReviews(profile.id);
   const tabs: { key: Tab; label: string }[] = [
     { key: 'organizes', label: `Собирает · ${profile.upcomingEvents.length}` },
     ...(isMe && mine.data
@@ -108,7 +110,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Cover sports={profile.sports} />
+        <Cover sports={profile.sports} attended={reviews.data?.asParticipant.attended} />
         <div className="relative -mt-14 flex flex-wrap items-start gap-4 px-4 sm:px-6">
           <span className="rounded-full shadow-md">
             <Avatar name={profile.name} size={112} />
@@ -224,37 +226,49 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
   );
 }
 
-/** Обложка: точечный узор в цвете первого интереса и до трёх «марок» с видами спорта. */
-function Cover({ sports }: { sports: Sport[] }) {
-  const color = sports[0] ? sportColor(sports[0].slug) : 'var(--color-accent)';
-  const places = [
-    { right: '6%', top: '18%', rotate: '8deg' },
-    { right: '17%', top: '46%', rotate: '-6deg' },
-    { right: '29%', top: '16%', rotate: '4deg' },
-  ];
+/**
+ * Обложка — покрытие площадки первого интереса: бег — дорожка, шахматы — доска, без интересов —
+ * поле. Футболка с номером — сколько встреч человек посетил (надёжность из отзывов).
+ */
+function Cover({ sports, attended }: { sports: Sport[]; attended?: number }) {
   return (
-    <div
-      aria-hidden="true"
-      className="relative h-36 overflow-hidden rounded-lg border-2 border-ink"
-      style={{
-        backgroundColor: color,
-        backgroundImage: 'radial-gradient(var(--color-ink) 1.2px, transparent 1.3px)',
-        backgroundSize: '18px 18px',
-      }}
+    <SportSurface
+      kind={sports[0] ? surfaceFor(sports[0].slug) : 'football'}
+      className="h-36 rounded-lg border-2 border-ink"
     >
-      {sports.slice(0, 3).map((sport, index) => (
-        <span
-          key={sport.id}
-          className="absolute hidden size-14 items-center justify-center rounded-md border-2 border-ink shadow-sm sm:inline-flex"
-          style={{
-            ...places[index],
-            background: index ? sportColor(sport.slug) : 'var(--color-surface)',
-          }}
-        >
-          <Icon name={sportIcon(sport.slug)} size={28} strokeWidth={1.8} />
-        </span>
-      ))}
-    </div>
+      {attended !== undefined && attended > 0 && <Jersey number={attended} />}
+    </SportSurface>
+  );
+}
+
+/** Футболка с номером на обложке. Номер — число посещённых встреч, подпись — для диктора. */
+function Jersey({ number }: { number: number }) {
+  return (
+    <svg
+      role="img"
+      aria-label={`Встреч посещено: ${number}`}
+      viewBox="0 0 64 60"
+      className="absolute top-4 right-6 h-24 w-26 rotate-6 drop-shadow-[3px_3px_0_var(--color-ink)]"
+    >
+      <path
+        d="M21 4l7 4c2 3 6 3 8 0l7-4l17 10l-6 12l-6-3v34H16V23l-6 3L4 14z"
+        fill="var(--color-surface)"
+        stroke="var(--color-ink)"
+        strokeWidth="2.5"
+        strokeLinejoin="round"
+      />
+      <text
+        x="32"
+        y="45"
+        textAnchor="middle"
+        fontFamily="var(--font-display)"
+        fontWeight="700"
+        fontSize={number > 99 ? 15 : 20}
+        fill="var(--color-ink)"
+      >
+        {number}
+      </text>
+    </svg>
   );
 }
 
@@ -277,7 +291,7 @@ function ProfileEventCard({ event, status }: { event: EventListItem; status?: Re
         <JoinModeBadge mode={event.joinMode} />
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <h3 className="text-[19px] leading-snug">
+        <h3 className="font-sans text-[19px] leading-snug font-semibold">
           <Link to={`/events/${event.id}`} className="no-underline hover:underline">
             {event.title}
           </Link>

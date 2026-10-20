@@ -1,0 +1,227 @@
+/*
+ * Покрытия площадок: поле, паркет, дорожка, бассейн, доска, стол, коврик, своя площадка.
+ * Цвета — из токенов (docs/design/tokens.css): поле — цвета парка с карты, паркет, бассейн,
+ * дорожка и коврик — из палитры видов спорта. Разметку рисуют пустые span под содержимым
+ * (z-index: -1 внутри isolation), поэтому текст и кнопки на покрытии всегда сверху.
+ */
+.sport-surface {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+.sport-surface > .surface-mark {
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Футбольное поле: полосы газона и белая разметка. */
+.surface-football,
+.surface-corner {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--map-park) 0 70px,
+    color-mix(in srgb, var(--map-park) 85%, var(--map-park-line)) 70px 140px
+  );
+}
+.surface-football > .surface-mark,
+.surface-corner > .surface-mark {
+  border: 3px solid rgb(255 255 255 / 0.95);
+}
+.surface-football .m-outer {
+  inset: 10px;
+  border-radius: 6px;
+}
+.surface-football .m-half {
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  border-width: 0 0 0 3px;
+}
+.surface-football .m-circle {
+  width: 130px;
+  height: 130px;
+  left: calc(50% - 65px);
+  top: calc(50% - 65px);
+  border-radius: 50%;
+}
+.surface-football .m-box-start,
+.surface-football .m-box-end {
+  top: 26%;
+  height: 48%;
+  width: clamp(48px, 9%, 96px);
+}
+.surface-football .m-box-start {
+  left: 10px;
+  border-left: 0;
+}
+.surface-football .m-box-end {
+  right: 10px;
+  border-right: 0;
+}
+
+/* Угол поля для 404: мяч ушёл за линию. */
+.surface-corner .m-outer {
+  left: 18px;
+  top: 18px;
+  right: -12px;
+  bottom: -12px;
+  border-right: 0;
+  border-bottom: 0;
+}
+.surface-corner .m-arc {
+  left: -28px;
+  top: -28px;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+}
+
+/* Паркет: баскетбол и волейбол. Доски и тёмная разметка, трёхочковые дуги у краёв. */
+.surface-court {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--sport-8) 0 22px,
+    color-mix(in srgb, var(--sport-8) 88%, var(--color-ink)) 22px 24px,
+    var(--sport-8) 24px 46px
+  );
+}
+.surface-court > .surface-mark {
+  border: 2.5px solid color-mix(in srgb, var(--color-ink) 55%, transparent);
+}
+.surface-court .m-outer {
+  inset: 10px;
+  border-radius: 4px;
+}
+.surface-court .m-half {
+  top: 10px;
+  bottom: 10px;
+  left: 50%;
+  border-width: 0 0 0 2.5px;
+}
+.surface-court .m-circle {
+  width: 100px;
+  height: 100px;
+  left: calc(50% - 50px);
+  top: calc(50% - 50px);
+  border-radius: 50%;
+}
+.surface-court .m-arc-start,
+.surface-court .m-arc-end {
+  top: 8%;
+  height: 84%;
+  width: 60%;
+  border-radius: 50%;
+}
+.surface-court .m-arc-start {
+  left: -30%;
+}
+.surface-court .m-arc-end {
+  right: -30%;
+}
+
+/* Беговая дорожка: белые линии и номера дорожек. Тот же рисунок у вело- и скандинавской ходьбы. */
+.surface-track {
+  background: var(--status-danger);
+}
+.surface-track .m-lane {
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-surface);
+}
+.surface-track .m-lane-no {
+  left: 10px;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--color-surface);
+  -webkit-text-stroke: 1px var(--color-ink);
+}
+
+/* Бассейн: вода и разделители дорожек в красно-белую полоску. */
+.surface-pool {
+  background:
+    radial-gradient(ellipse 30px 6px at 50% 50%, rgb(255 255 255 / 0.45), transparent 70%) 0 0 /
+      80px 26px,
+    var(--status-free);
+}
+.surface-pool .m-rope {
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--color-surface) 0 10px,
+    var(--color-danger) 10px 20px
+  );
+  border-block: 1px solid var(--color-ink);
+}
+
+/* Доска: шахматы, шашки, настольные игры. */
+.surface-chess {
+  background: repeating-conic-gradient(
+      var(--sport-3) 0 25%,
+      color-mix(in srgb, var(--sport-3) 25%, var(--color-surface)) 0 50%
+    )
+    0 0 / 56px 56px;
+}
+
+/* Теннисный стол: белая кромка, средняя линия и сетка. */
+.surface-table {
+  background: var(--status-free);
+}
+.surface-table .m-outer {
+  inset: 12px;
+  border: 3px solid var(--color-surface);
+  border-radius: 4px;
+}
+.surface-table .m-mid {
+  left: 12px;
+  right: 12px;
+  top: 50%;
+  border-top: 3px solid var(--color-surface);
+}
+.surface-table .m-net {
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 5px);
+  width: 10px;
+  border-inline: 2px solid var(--color-ink);
+  background:
+    repeating-linear-gradient(0deg, var(--color-ink) 0 2px, transparent 2px 6px),
+    repeating-linear-gradient(90deg, var(--color-ink) 0 2px, transparent 2px 6px);
+}
+
+/* Коврик: йога, растяжка. */
+.surface-yoga {
+  background: var(--sport-6);
+}
+.surface-yoga .m-mat {
+  inset: 12px 6%;
+  border: 2px solid var(--color-ink);
+  border-radius: 22px;
+  background: repeating-linear-gradient(
+    0deg,
+    color-mix(in srgb, var(--sport-6) 60%, var(--color-surface)) 0 8px,
+    color-mix(in srgb, var(--sport-6) 80%, var(--color-surface)) 8px 10px
+  );
+}
+
+/* Своя площадка: свой вид спорта без узнанной темы — разметка в клетку и фишки. */
+.surface-custom {
+  background:
+    linear-gradient(90deg, transparent 49.5%, rgb(255 255 255 / 0.9) 49.5% 50.5%, transparent 50.5%)
+      0 0 / 90px 90px,
+    linear-gradient(0deg, transparent 49.5%, rgb(255 255 255 / 0.9) 49.5% 50.5%, transparent 50.5%)
+      0 0 / 90px 90px,
+    var(--status-neutral);
+}
+.surface-custom .m-cone {
+  width: 0;
+  height: 0;
+  border-left: 11px solid transparent;
+  border-right: 11px solid transparent;
+  border-bottom: 22px solid var(--sport-8);
+  filter: drop-shadow(2px 2px 0 var(--color-ink));
+}
