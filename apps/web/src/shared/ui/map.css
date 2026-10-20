@@ -58,15 +58,20 @@
   box-shadow: none;
   color: var(--color-ink-muted);
 }
+/*
+ * --pin-k — масштаб метки (pinScale в map.ts): вблизи замок меньше вместе с меткой,
+ * но не мельче 3/4 — режим «По заявке» должен читаться и на маленькой метке.
+ */
 .pin__lock {
+  --lock-k: max(var(--pin-k, 1), 0.75);
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: calc(-6px * var(--lock-k));
+  right: calc(-6px * var(--lock-k));
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: calc(22px * var(--lock-k));
+  height: calc(22px * var(--lock-k));
   border-radius: 50%;
   background: var(--color-ink);
 }

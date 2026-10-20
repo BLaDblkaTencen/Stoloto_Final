@@ -3,7 +3,15 @@
 // Фильтры живут в адресе страницы: ссылкой на подборку можно поделиться, «Назад» возвращает фильтр.
 import { EVENT_LEVEL_LABELS, EVENT_LEVELS, JOIN_MODE_LABELS, JOIN_MODES } from '@sport/shared';
 import type { EventListItem } from '@sport/shared/schemas/events';
-import { useId, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+  type ReactNode,
+} from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
@@ -405,7 +413,7 @@ function EventsSplit({
           </Button>
         </div>
       )}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] lg:items-stretch xl:grid-cols-[minmax(0,540px)_minmax(0,1fr)]">
         {(wide || view === 'list') && (
           <EventList
             params={params}
@@ -423,7 +431,7 @@ function EventsSplit({
               selectedId={selectedId}
               onSelect={selectFromMap}
               focus={focus}
-              className="h-[70vh] min-h-[420px] lg:h-[780px]"
+              className="h-[70vh] min-h-[420px] lg:h-[min(780px,calc(100dvh_-_7rem))]"
             />
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <span className="flex flex-wrap items-center gap-3 font-semibold">
@@ -446,6 +454,9 @@ function EventsSplit({
   );
 }
 
+// Затухание нижнего края списка, пока ниже есть карточки.
+const FADE_BOTTOM = 'linear-gradient(to bottom, #000 calc(100% - 56px), transparent)';
+
 function EventList({
   params,
   hasFilters,
@@ -463,6 +474,21 @@ function EventList({
 }) {
   const feed = useFeed(params);
   const total = feed.data?.pages[0].total;
+  const scroller = useRef<HTMLDivElement>(null);
+  const [moreBelow, setMoreBelow] = useState(false);
+  const checkMore = () => {
+    const el = scroller.current;
+    if (el) setMoreBelow(el.scrollTop + el.clientHeight < el.scrollHeight - 8);
+  };
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const observer = new ResizeObserver(checkMore);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  // Новая страница ленты или другие фильтры меняют высоту содержимого.
+  useEffect(checkMore);
   const events = feed.data?.pages.flatMap((page) => page.items) ?? [];
 
   let body: ReactNode;
@@ -514,38 +540,46 @@ function EventList({
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="font-display text-[26px] leading-tight font-bold">Рядом с вами</h2>
-        {total !== undefined && (
-          <span className="text-sm text-ink-muted">
-            {plural(total, ['встреча', 'встречи', 'встреч'])}
-          </span>
-        )}
-      </div>
-      <p className="text-sm text-ink-muted">{LOCAL_TIME_NOTE}</p>
-      <div className="grid grid-cols-2 gap-3">
-        <SelectField
-          label="Режим записи"
-          placeholder="Любой"
-          options={JOIN_MODES.map((value) => ({ value, label: JOIN_MODE_LABELS[value] }))}
-          value={params.joinMode ?? ''}
-          onChange={(e) => onParam('mode', e.target.value)}
-        />
-        <SelectField
-          label="Уровень"
-          placeholder="Любой"
-          options={EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_LABELS[value] }))}
-          value={params.level ?? ''}
-          onChange={(e) => onParam('level', e.target.value)}
-        />
-      </div>
-      <div
-        aria-busy={feed.isFetching || undefined}
-        // Отступ справа и снизу — под жёсткую тень карточек, иначе прокрутка её обрезает.
-        className="flex flex-col gap-3.5 lg:max-h-[600px] lg:overflow-y-auto lg:pr-2.5 lg:pb-2.5"
-      >
-        {body}
+    // На широком экране высоту ряда задаёт карта, а список занимает её же высоту
+    // и листается сам, колесом над ним; страница при этом остаётся на месте.
+    <div className="relative min-w-0">
+      <div className="flex flex-col gap-3 lg:absolute lg:inset-0">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="font-display text-[26px] leading-tight font-bold">Рядом с вами</h2>
+          {total !== undefined && (
+            <span className="text-sm text-ink-muted">
+              {plural(total, ['встреча', 'встречи', 'встреч'])}
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-ink-muted">{LOCAL_TIME_NOTE}</p>
+        <div className="grid grid-cols-2 gap-3">
+          <SelectField
+            label="Режим записи"
+            placeholder="Любой"
+            options={JOIN_MODES.map((value) => ({ value, label: JOIN_MODE_LABELS[value] }))}
+            value={params.joinMode ?? ''}
+            onChange={(e) => onParam('mode', e.target.value)}
+          />
+          <SelectField
+            label="Уровень"
+            placeholder="Любой"
+            options={EVENT_LEVELS.map((value) => ({ value, label: EVENT_LEVEL_LABELS[value] }))}
+            value={params.level ?? ''}
+            onChange={(e) => onParam('level', e.target.value)}
+          />
+        </div>
+        <div
+          ref={scroller}
+          aria-busy={feed.isFetching || undefined}
+          onScroll={checkMore}
+          // Ползунок скрыт; что ниже есть ещё карточки, показывает затухание у нижнего края.
+          // Отступ справа и снизу — под жёсткую тень карточек, иначе прокрутка её обрезает.
+          className="flex flex-col gap-3.5 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:pr-2.5 lg:pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [&>*]:shrink-0"
+          style={moreBelow ? { maskImage: FADE_BOTTOM } : undefined}
+        >
+          {body}
+        </div>
       </div>
     </div>
   );

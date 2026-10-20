@@ -18,5 +18,5 @@ export { sportColor, sportColorIndex, sportIcon } from './sport';
 export { EmptyState, ErrorState, Skeleton, SkeletonList } from './States';
 export { TextareaField } from './TextareaField';
 export { TextField } from './TextField';
-export { eventPin, pinIcon, venuePin, venueTypeIcon } from './map';
+export { eventPin, pinIcon, pinScale, venuePin, venueTypeIcon } from './map';
 export { MapPopupCard, MapUnavailable, VenueCard, type VenueCardData } from './MapParts';

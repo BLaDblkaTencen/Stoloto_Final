@@ -2,19 +2,22 @@
 // Файл грузится лениво вместе с Leaflet, поэтому в первый экран сайта карта не попадает.
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
-import { useRef, useState, type ReactNode } from 'react';
-import { AttributionControl, MapContainer, TileLayer } from 'react-leaflet';
-import { MapUnavailable } from '../../../shared/ui';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { AttributionControl, MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { MapUnavailable, pinScale } from '../../../shared/ui';
 
 /** Центр Красноярска (у Центрального парка) — город демо-данных. */
 export const CITY_CENTER: [number, number] = [56.01, 92.853];
+
+/** Масштаб карты, если его не задали явно: город целиком. */
+export const DEFAULT_ZOOM = 13;
 
 // Если подряд не загрузилось столько плиток и ни одной удачной — сети нет или OSM недоступен.
 const TILE_ERRORS_LIMIT = 4;
 
 export function BaseMap({
   center = CITY_CENTER,
-  zoom = 13,
+  zoom = DEFAULT_ZOOM,
   className = 'h-[480px]',
   label,
   children,
@@ -89,4 +92,16 @@ export function cachedIcon(key: string, make: () => L.DivIconOptions): L.DivIcon
     iconCache.set(key, icon);
   }
   return icon;
+}
+
+/**
+ * Сообщает масштаб меток (pinScale) при открытии карты и после приближения или отдаления.
+ * Метки рисует родитель карты, поэтому масштаб уходит наверх в его состояние.
+ */
+export function PinScaleWatcher({ onChange }: { onChange: (scale: number) => void }) {
+  const map = useMap();
+  const report = () => onChange(pinScale(map.getZoom()));
+  useMapEvents({ zoomend: report });
+  useEffect(report, []);
+  return null;
 }
