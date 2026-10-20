@@ -1,11 +1,14 @@
 // «Мои мероприятия» (задача 1.7): куда я записан, со статусами и пояснениями, и что организую,
 // со счётчиком новых заявок. Снятые события тоже здесь: человек видит «Публикация недоступна».
 // Вкладка и период — в адресе страницы, чтобы «Назад» из карточки события возвращал туда же.
-import type { EventListItem } from '@sport/shared/schemas/events';
-import type { ReactNode } from 'react';
+// В «Прошедших» здесь же оценивают встречу и отмечают участников (окна из reviews/).
+import type { EventListItem, MyEventItem } from '@sport/shared/schemas/events';
+import type { MyRegistrationItem } from '@sport/shared/schemas/registrations';
+import { useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import {
   Badge,
+  Button,
   ButtonLink,
   Chip,
   EmptyState,
@@ -19,6 +22,9 @@ import { useMe } from '../auth/api';
 import { useMyEvents, useMyRegistrations, type Scope } from './api';
 import { MetaLine, SportTile } from './EventBits';
 import { formatSeats, formatWhen, LOCAL_TIME_NOTE, plural } from './format';
+import { AttendanceModal } from './reviews/AttendanceModal';
+import { ReviewModal } from './reviews/ReviewModal';
+import { Stars } from './reviews/Stars';
 
 type Tab = 'join' | 'organize';
 
@@ -130,6 +136,7 @@ function Joined({ scope }: { scope: Scope }) {
                 ? `Публикация недоступна${item.moderationReason ? `: ${item.moderationReason}` : ''}`
                 : hint}
             </span>
+            {item.review && <ReviewAction item={item} />}
           </EventRow>
         );
       })}
@@ -163,9 +170,55 @@ function Organized({ scope }: { scope: Scope }) {
           {item.status !== 'published' && item.moderationReason && (
             <span className="text-sm text-ink-muted">Причина: {item.moderationReason}</span>
           )}
+          {item.attendance && <AttendanceAction item={item} />}
         </EventRow>
       ))}
     </ul>
+  );
+}
+
+/** Отзыв о прошедшей встрече: «Оценить», «Изменить» или уже оставленные звёзды. */
+function ReviewAction({ item }: { item: MyRegistrationItem }) {
+  const [open, setOpen] = useState(false);
+  const review = item.review!;
+  return (
+    <>
+      {review.mine ? (
+        <Badge tone="success">
+          Отзыв оставлен <Stars rating={review.mine.rating} size={16} />
+        </Badge>
+      ) : (
+        !review.open && <span className="text-sm text-ink-muted">Время для отзыва вышло</span>
+      )}
+      {review.open && (
+        <Button variant={review.mine ? 'secondary' : 'primary'} onClick={() => setOpen(true)}>
+          {review.mine ? 'Изменить отзыв' : 'Оценить встречу'}
+        </Button>
+      )}
+      <ReviewModal event={item} open={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+
+/** Отметки организатора: кто пришёл на прошедшую встречу. */
+function AttendanceAction({ item }: { item: MyEventItem }) {
+  const [open, setOpen] = useState(false);
+  const attendance = item.attendance!;
+  if (item.participantsCount === 0) return null;
+  return (
+    <>
+      {attendance.marked && <Badge tone="success">Участники отмечены</Badge>}
+      {attendance.open ? (
+        <Button variant={attendance.marked ? 'secondary' : 'primary'} onClick={() => setOpen(true)}>
+          {attendance.marked ? 'Изменить отметки' : 'Отметить участников'}
+        </Button>
+      ) : (
+        !attendance.marked && (
+          <span className="text-sm text-ink-muted">Время для отметок вышло</span>
+        )
+      )}
+      <AttendanceModal event={item} open={open} onClose={() => setOpen(false)} />
+    </>
   );
 }
 

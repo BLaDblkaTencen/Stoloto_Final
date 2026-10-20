@@ -22,6 +22,7 @@ import {
   Modal,
   SkeletonList,
 } from '../../../shared/ui';
+import { Reliability } from '../../user/reviews/ReviewList';
 import { useDecideRegistration, useEventRegistrations } from './api';
 
 const TAB_LABELS: Record<RegistrationStatus, string> = {
@@ -139,6 +140,8 @@ export function OrganizerPanel({ event }: { event: EventDetails }) {
                       DECIDED[item.status] &&
                       ` · ${DECIDED[item.status]} ${formatDateTime(item.decidedAt)}`}
                   </p>
+                  {/* Надёжность по прошлым встречам помогает решить по заявке (модуль отзывов). */}
+                  <Reliability summary={item.user.reliability} />
                   {item.user.about && <p className="text-sm">{item.user.about}</p>}
                   {item.message && (
                     <p className="whitespace-pre-line rounded-md bg-surface-muted p-3">

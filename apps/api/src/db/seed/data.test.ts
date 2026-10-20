@@ -5,11 +5,13 @@ import {
   EVENTS,
   ORGANIZATIONS,
   REGISTRATIONS,
+  REVIEWS,
   SPORTS,
   USERS,
   VENUES,
   CUSTOM_SPORT,
 } from './data';
+import { REVIEW_WINDOW_DAYS } from '@sport/shared/schemas/reviews';
 import { krasnoyarskTime } from './time';
 
 const eventByKey = new Map(EVENTS.map((event) => [event.key, event]));
@@ -30,6 +32,23 @@ describe('демо-данные', () => {
       expect(USERS[user]).toBeDefined();
     }
     for (const comment of COMMENTS) expect(eventByKey.has(comment.event), comment.event).toBe(true);
+  });
+
+  it('отзывы оставляют участники встречи, а отмечает их её автор', () => {
+    const confirmed = (event: string, user: string) =>
+      REGISTRATIONS.some(([k, u, s]) => k === event && u === user && s === 'confirmed');
+    for (const review of REVIEWS) {
+      const event = eventByKey.get(review.event)!;
+      expect(event, review.event).toBeDefined();
+      expect(event.when.days, `${review.event}: отзыв только о прошедшей`).toBeLessThan(0);
+      if (review.about) {
+        expect(review.author, review.event).toBe(event.author);
+        expect(confirmed(review.event, review.about), review.event).toBe(true);
+      } else {
+        expect(review.rating, `${review.event}: звёзды обязательны`).toBeDefined();
+        expect(confirmed(review.event, review.author), review.event).toBe(true);
+      }
+    }
   });
 
   it('событие от организации создаёт её представитель', () => {
@@ -57,7 +76,7 @@ describe('демо-данные', () => {
   });
 
   it('для сценариев ТЗ есть всё нужное', () => {
-    const published = EVENTS.filter((e) => !e.unpublishedReason);
+    const published = EVENTS.filter((e) => !e.unpublishedReason && e.when.days >= 0);
     const user1Events = new Set(REGISTRATIONS.filter(([, u]) => u === 'user1').map(([k]) => k));
     // Сценарий 3: участник может записаться на свободное событие с местами.
     expect(
@@ -99,13 +118,42 @@ describe('время демо-событий', () => {
     expect(krasnoyarskTime(1, '07:30', now).toISOString()).toBe('2026-10-21T00:30:00.000Z');
   });
 
-  it('все демо-события в будущем', () => {
+  it('события для записи — в будущем, для отзывов — прошли не раньше окна отзывов', () => {
     const now = new Date();
     for (const event of EVENTS) {
-      expect(
-        krasnoyarskTime(event.when.days, event.when.time, now).getTime(),
-        event.key,
-      ).toBeGreaterThan(now.getTime());
+      const start = krasnoyarskTime(event.when.days, event.when.time, now).getTime();
+      if (event.when.days >= 0) {
+        expect(start, event.key).toBeGreaterThan(now.getTime());
+      } else {
+        expect(start, event.key).toBeLessThan(now.getTime());
+      }
     }
+    // Эксперт проверяет отзывы сам: у Ивана есть прошедшая встреча с открытым окном, которую
+    // он ещё не оценил, и своя прошедшая встреча с участниками, которых он ещё не отметил.
+    const fresh = (event: (typeof EVENTS)[number]) =>
+      event.when.days < 0 && -event.when.days < REVIEW_WINDOW_DAYS;
+    const reviewedByIvan = new Set(
+      REVIEWS.filter((r) => !r.about && r.author === 'user1').map((r) => r.event),
+    );
+    const marked = new Set(REVIEWS.filter((r) => r.about).map((r) => r.event));
+    expect(
+      EVENTS.some(
+        (event) =>
+          fresh(event) &&
+          REGISTRATIONS.some(
+            ([k, u, s]) => k === event.key && u === 'user1' && s === 'confirmed',
+          ) &&
+          !reviewedByIvan.has(event.key),
+      ),
+    ).toBe(true);
+    expect(
+      EVENTS.some(
+        (event) =>
+          fresh(event) &&
+          event.author === 'user1' &&
+          !marked.has(event.key) &&
+          REGISTRATIONS.some(([k, , s]) => k === event.key && s === 'confirmed'),
+      ),
+    ).toBe(true);
   });
 });

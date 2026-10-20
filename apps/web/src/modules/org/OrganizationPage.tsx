@@ -14,6 +14,7 @@ import {
   SkeletonList,
   StatusBadge,
 } from '../../shared/ui';
+import { OrganizationReviewsSection } from '../user/reviews/ReviewList';
 import { useOrganization, useOrganizationEvents } from './api';
 import { SportTag } from './SportTag';
 
@@ -99,6 +100,9 @@ export function OrganizationPage() {
           </ul>
         )}
       </section>
+
+      {/* Отзывы участников о встречах клуба (модуль отзывов участника 1). */}
+      {isPublic && <OrganizationReviewsSection orgId={data.id} />}
     </div>
   );
 }

@@ -39,6 +39,7 @@ import { useMyRegistrations, useProfile, useSports, useUpdateProfile } from './a
 import { MetaLine } from './EventBits';
 import { sportTileClass } from './EventFormParts';
 import { formatSeats, formatSince, formatWhen } from './format';
+import { ProfileReviews } from './reviews/ReviewList';
 
 export function ProfilePage() {
   const { id = '' } = useParams();
@@ -85,11 +86,12 @@ function appendPrompt(text: string, prompt: string) {
   return `${current}${/[.!?…]$/.test(current) ? '' : '.'} ${prompt}`;
 }
 
-type Tab = 'organizes' | 'joins' | 'interests';
+type Tab = 'organizes' | 'joins' | 'reviews' | 'interests';
 
 /**
  * Профиль как страница клуба: обложка в цвете любимого вида спорта, крупный аватар, вкладки
- * «Собирает», «Мои записи» (только свой профиль: куда человек ходит, видит он один) и «Интересы».
+ * «Собирает», «Мои записи» (только свой профиль: куда человек ходит, видит он один), «Отзывы»
+ * (оценка как организатора и надёжность как участника) и «Интересы».
  */
 function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean }) {
   const [tab, setTab] = useState<Tab>('organizes');
@@ -99,6 +101,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
     ...(isMe && mine.data
       ? [{ key: 'joins' as const, label: `Мои записи · ${mine.data.total}` }]
       : []),
+    { key: 'reviews', label: 'Отзывы' },
     { key: 'interests', label: `Интересы · ${profile.sports.length}` },
   ];
 
@@ -197,6 +200,7 @@ function ProfileView({ profile, isMe }: { profile: UserProfile; isMe: boolean })
               ))}
             </CardGrid>
           ))}
+        {tab === 'reviews' && <ProfileReviews userId={profile.id} />}
         {tab === 'interests' &&
           (profile.sports.length === 0 ? (
             <p className="text-ink-muted">Интересы пока не указаны.</p>

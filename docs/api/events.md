@@ -1,4 +1,4 @@
-# API: мероприятия, запись, обсуждение, профиль (участник 1)
+# API: мероприятия, запись, обсуждение, профиль, отзывы (участник 1)
 
 Общие правила и формат ошибок — [../api.md](../api.md). Сущности и правила — [../DATA_MODEL.md](../DATA_MODEL.md). Модули: `sports`, `events`, `registrations`, `comments`, `profiles`.
 
@@ -77,6 +77,8 @@ type EventDetails = EventListItem & {
   };
   // Почему нельзя записаться (если canJoin = false): код из таблицы ошибок и текст для кнопки.
   joinBlock: { code: string; message: string } | null;
+  // Оценка организатора участниками прошлых встреч (раздел «Отзывы»): человека или клуба.
+  organizerRating: OrganizerSummary;
 };
 ```
 
@@ -93,7 +95,7 @@ type EventDetails = EventListItem & {
 | Метод | Путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- | --- |
 | GET | `/api/events` | все | см. «Фильтры ленты» | `{ items: EventListItem[], total }`, только `published`, по возрастанию `startsAt`; при `view=map` — `{ items: EventMapItem[], total }` | 422 |
-| GET | `/api/events/mine` | `user`, `organization` | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { status; moderationReason; pendingCount: number })[], total }` — события, которые я организую, включая снятые, со счётчиком ожидающих заявок | 401; 403 |
+| GET | `/api/events/mine` | `user`, `organization` | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { status; moderationReason; pendingCount: number; attendance: AttendanceState \| null })[], total }` — события, которые я организую, включая снятые, со счётчиком ожидающих заявок; у прошедших опубликованных — можно ли отметить участников | 401; 403 |
 | GET | `/api/events/:id` | все | — | `EventDetails` | 404 `EVENT_NOT_FOUND`; 404 `EVENT_UNAVAILABLE` — снято или удалено, а я не организатор, не записан и не админ |
 | POST | `/api/events` | `user`, `organization` | `EventInput` | 201 `EventDetails` | 401; 403; ошибки проверки организации; 422 по полям |
 | PATCH | `/api/events/:id` | автор события | часть полей `EventInput` | `EventDetails` | 401; 403 `NOT_EVENT_AUTHOR`; 404; 409 `EVENT_UNAVAILABLE`, `EVENT_PAST`, `CAPACITY_BELOW_PARTICIPANTS`, `JOIN_MODE_LOCKED`; 422 |
@@ -145,7 +147,7 @@ type EventDetails = EventListItem & {
 | --- | --- | --- | --- | --- | --- |
 | POST | `/api/events/:id/registration` | `user` | `{ message?: string }` — до 500 символов, только для режима «по заявке» | 200 `MyRegistration`: `confirmed` при `free`, `pending` при `request` | 401; 403; 404; 409 `EVENT_UNAVAILABLE`, `EVENT_PAST`, `OWN_EVENT`, `EVENT_FULL`, `ALREADY_REGISTERED`, `REGISTRATION_REJECTED` |
 | DELETE | `/api/events/:id/registration` | `user` | — | 200 `MyRegistration` со статусом `cancelled` | 401; 404; 409 `NOT_REGISTERED`, `EVENT_PAST` |
-| GET | `/api/registrations/mine` | `user` | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { status; moderationReason })[], total }`; у каждого заполнен `myRegistration`. Снятые тоже, чтобы человек видел «Публикация недоступна» | 401; 403 |
+| GET | `/api/registrations/mine` | `user` | `?scope=upcoming` (по умолчанию) или `past` | `{ items: (EventListItem & { status; moderationReason; review: ReviewState \| null })[], total }`; у каждого заполнен `myRegistration`. Снятые тоже, чтобы человек видел «Публикация недоступна». `review` — только у прошедших встреч, где я был подтверждённым участником | 401; 403 |
 
 - Повторная запись после отмены меняет статус той же строки (`cancelled` → `confirmed` / `pending`), новой записи не создаёт. После отказа (`rejected`) записаться снова нельзя.
 - Проверка мест и запись идут в одной транзакции с `SELECT … FOR UPDATE` на строке события: два человека не займут последнее место.
@@ -162,7 +164,13 @@ type OrganizerRegistration = {
   message: string | null;
   createdAt: string;
   decidedAt: string | null;
-  user: { id: string; name: string; avatarUrl: string | null; about: string | null };
+  user: {
+    id: string;
+    name: string;
+    avatarUrl: string | null;
+    about: string | null;
+    reliability: ParticipantSummary; // надёжность по прошлым встречам, раздел «Отзывы»
+  };
 };
 
 /** Записи события для его автора: сначала pending, затем новее. */
@@ -229,6 +237,58 @@ type Comment = {
 
 Email и пароль здесь не меняются (вход — модуль `auth`, участник 3).
 
+## Отзывы (`reviews`)
+
+Правила — [DATA_MODEL.md](../DATA_MODEL.md), раздел «Review». Схемы и типы — `packages/shared/src/schemas/reviews.ts`.
+
+| Метод | Путь | Кто | Запрос | Успех | Ошибки |
+| --- | --- | --- | --- | --- | --- |
+| PUT | `/api/events/:id/review` | `user` | `{ rating: 1..5, tags?: OrganizerTag[], comment?: string }` | 200 `MyReview`; повторный запрос правит тот же отзыв | 401; 403 `NOT_PARTICIPANT`, `OWN_EVENT`; 404; 409 `EVENT_UNAVAILABLE`, `REVIEW_NOT_YET`, `REVIEW_CLOSED`; 422 |
+| GET | `/api/events/:id/attendance` | автор события | — | `Attendance`: подтверждённые участники с отметками | 401; 403 `NOT_EVENT_AUTHOR`; 404 |
+| PUT | `/api/events/:id/attendance` | автор события | `{ marks: { userId, attended, rating?, tags?: ParticipantTag[], comment? }[] }` | 200 `Attendance` | 401; 403 `NOT_EVENT_AUTHOR`; 404; 409 как у отзыва; 422 `NOT_PARTICIPANT` — отмечен не участник встречи |
+| GET | `/api/users/:id/reviews` | все | — | `UserReviews` | 404 `USER_NOT_FOUND` |
+| GET | `/api/organizations/:id/reviews` | все | — | `OrganizationReviews` | 404 `ORG_NOT_FOUND` — нет или не допущена |
+
+```ts
+type RatingSummary = { rating: number | null; count: number }; // rating null, пока отзывов меньше трёх
+type OrganizerSummary = RatingSummary & { organized: number }; // проведённые встречи
+type ParticipantSummary = RatingSummary & { attended: number; total: number }; // «приходит на attended из total»
+
+type Review = {
+  id: string;
+  direction: 'participant_to_organizer' | 'organizer_to_participant';
+  rating: number | null;
+  tags: ReviewTag[];
+  comment: string | null;
+  attended: boolean | null; // только у отметки организатора
+  createdAt: string;
+  author: { type: 'user' | 'organization'; id: string; name: string }; // за клуб — его название
+  event: { id: string; title: string; startsAt: string };
+};
+
+type UserReviews = { asOrganizer: OrganizerSummary; asParticipant: ParticipantSummary; items: Review[] };
+type OrganizationReviews = { summary: OrganizerSummary; items: Review[] };
+
+type MyReview = { rating: number; tags: OrganizerTag[]; comment: string | null; updatedAt: string };
+type ReviewState = { open: boolean; closesAt: string; mine: MyReview | null }; // в «Моих записях»
+type AttendanceState = { open: boolean; closesAt: string; marked: boolean }; // в «Я организую»
+type Attendance = {
+  open: boolean;
+  closesAt: string;
+  items: {
+    user: { id: string; name: string };
+    marked: boolean; // ещё не отмечен — считается пришедшим
+    attended: boolean;
+    rating: number | null;
+    tags: ParticipantTag[];
+    comment: string | null;
+  }[];
+};
+```
+
+- В списках только видимые отзывы (слепые отзывы, DATA_MODEL) со звёздами, тегами или текстом; голая отметка «пришёл» в список не попадает, но входит в надёжность. Не больше 50 последних.
+- У неявки звёзды и теги сервер отбрасывает, комментарий остаётся.
+
 ## Коды ошибок модулей
 
 | `code` | HTTP | Сообщение для человека |
@@ -247,8 +307,12 @@ Email и пароль здесь не меняются (вход — модул�
 | `CAPACITY_BELOW_PARTICIPANTS` | 409 | «Уже записано больше людей, чем новый лимит» |
 | `JOIN_MODE_LOCKED` | 409 | «Режим записи нельзя менять, когда уже есть записи» |
 | `USER_NOT_FOUND` | 404 | «Пользователь не найден» |
+| `NOT_PARTICIPANT` | 403 / 422 | «Оценить встречу могут только её участники» / «Отметить можно только подтверждённых участников встречи» |
+| `REVIEW_NOT_YET` | 409 | «Оценить встречу можно после её окончания» |
+| `REVIEW_CLOSED` | 409 | «Отзыв оставляют в течение 14 дней после встречи» |
+| `OWN_EVENT` (отзывы) | 403 | «Свою встречу оценить нельзя» |
 | `ORG_NOT_FOUND`, `ORG_NOT_APPROVED`, `VENUE_NOT_FOUND` | 404 / 403 / 422 | коды и тексты модулей участника 2 |
 
 ## Страницы интерфейса зоны
 
-`/` — лента и карта, `/events/:id` — карточка, `/events/new` — создание, `/events/:id/edit` — правка, `/me/events` — «Мои мероприятия», `/users/:id` — профиль. Страница организации `/organizations/:id` — у участника 2.
+`/` — лента и карта, `/events/:id` — карточка, `/events/new` — создание, `/events/:id/edit` — правка, `/me/events` — «Мои мероприятия» (в «Прошедших» — окна «Оцените встречу» и «Кто пришёл на встречу?»), `/users/:id` — профиль с вкладкой «Отзывы». Страница организации `/organizations/:id` — у участника 2.

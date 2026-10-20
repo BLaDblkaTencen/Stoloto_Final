@@ -11,6 +11,7 @@ import organizations from './organizations/routes';
 import organizerPanel from './organizer-panel/routes';
 import profiles from './profiles/routes';
 import registrations from './registrations/routes';
+import reviews from './reviews/routes';
 import sports from './sports/routes';
 import venues from './venues/routes';
 
@@ -22,6 +23,7 @@ const modules = [
   events,
   registrations,
   comments,
+  reviews,
   profiles,
   organizations,
   organizerPanel,

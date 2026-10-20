@@ -22,6 +22,7 @@ import { OrganizerPanel } from '../org/panel/OrganizerPanel';
 import { useEvent } from './api';
 import { MetaLine, OrganizerLink, SportTile } from './EventBits';
 import { formatSeats, formatWhen, LOCAL_TIME_NOTE } from './format';
+import { OrganizerRating } from './reviews/ReviewList';
 import { Discussion } from './Discussion';
 import { JoinPanel } from './JoinPanel';
 
@@ -82,8 +83,11 @@ function EventView({ event }: { event: EventDetails }) {
               <Badge icon={null}>{EVENT_LEVEL_LABELS[event.level]}</Badge>
             </div>
             <h1 className="text-h2 leading-tight">{event.title}</h1>
-            <p>
-              Организатор: <OrganizerLink organizer={event.organizer} />
+            <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span>
+                Организатор: <OrganizerLink organizer={event.organizer} />
+              </span>
+              <OrganizerRating summary={event.organizerRating} />
             </p>
           </header>
 

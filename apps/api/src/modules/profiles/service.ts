@@ -13,7 +13,7 @@ import { sportColumns } from '../sports/service';
 
 const UPCOMING_LIMIT = 20;
 
-const userNotFound = () => new AppError(404, 'USER_NOT_FOUND', 'Пользователь не найден');
+export const userNotFound = () => new AppError(404, 'USER_NOT_FOUND', 'Пользователь не найден');
 
 /** id пользователя из пути; не UUID — такого пользователя нет. */
 export function userIdFrom(params: unknown): string {
