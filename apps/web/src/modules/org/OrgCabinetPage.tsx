@@ -1,18 +1,32 @@
-// Кабинет организации (задачи 2.2, 2.3): подача заявки, её статус, правка данных, повторная подача.
+// Кабинет организации (задачи 2.2, 2.3): подача заявки, сводка «допуск · оценка · встречи»,
+// анкета и отзывы участников, правка данных и повторная подача после отказа.
 import type { OrgStatus } from '@sport/shared';
+import { EVENT_TIMEZONE } from '@sport/shared/schemas/events';
 import type { OrganizationOwner } from '@sport/shared/schemas/organizations';
-import { useState } from 'react';
+import {
+  RATING_MIN_REVIEWS,
+  REVIEW_TAG_LABELS,
+  type OrganizationReviews,
+  type Review,
+  type ReviewTag,
+} from '@sport/shared/schemas/reviews';
+import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router';
 import { RequireAuth } from '../auth/RequireAuth';
 import {
   Alert,
+  Badge,
   Button,
-  ButtonLink,
   Card,
   ErrorState,
   Icon,
   SkeletonList,
-  StatusBadge,
+  type IconName,
 } from '../../shared/ui';
+import { useMyEvents, useOrganizationReviews } from '../user/api';
+import { plural } from '../user/format';
+import { ReviewItems } from '../user/reviews/ReviewList';
+import { formatRating, Stars } from '../user/reviews/Stars';
 import {
   useCreateOrganization,
   useMyOrganization,
@@ -70,99 +84,251 @@ function Apply() {
 
 function Cabinet({ org }: { org: OrganizationOwner }) {
   const [editing, setEditing] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saved, setSaved] = useState<string | null>(null);
   const update = useUpdateOrganization();
   const resubmit = useResubmitOrganization();
+  const rejected = org.status === 'rejected';
+  const approved = org.status === 'approved';
+  // Отзывы и встречи бывают только у допущенного клуба, остальным их не запрашиваем.
+  const reviews = useOrganizationReviews(org.id, approved);
+  const upcoming = useMyEvents(approved);
   const { message, fields } = formErrors(update.error, 'Не удалось сохранить изменения');
+  const resubmitError = formErrors(resubmit.error, 'Не удалось подать заявку').message;
+
+  const startEdit = () => {
+    setSaved(null);
+    update.reset();
+    resubmit.reset();
+    setEditing(true);
+  };
+  const done = (text: string) => {
+    setEditing(false);
+    setSaved(text);
+  };
+  const side = approved || rejected;
 
   return (
-    <div className="mx-auto flex max-w-3xl flex-col gap-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-h2">{org.name}</h1>
-        <StatusBadge kind="organization" status={org.status} />
+    <div className="mx-auto flex max-w-5xl flex-col gap-6">
+      <h1 className="text-h2">{org.name}</h1>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <StatusTile org={org} />
+        <RatingTile approved={approved} reviews={reviews} />
+        <MeetingsTile
+          approved={approved}
+          organized={reviews.data?.summary.organized}
+          upcoming={upcoming.data?.total}
+        />
       </div>
 
-      <Steps status={org.status} />
-
-      {org.status === 'pending' && (
-        <Alert tone="warning">
-          Заявка на рассмотрении. Пока администратор её не одобрит, публиковать события нельзя.
-          Решение появится на этой странице.
-        </Alert>
-      )}
-      {org.status === 'rejected' && (
-        <Card className="flex flex-col gap-4">
-          <Alert>
-            Заявка отклонена
-            {org.rejectionReason ? `: ${org.rejectionReason}` : ''}. Исправьте данные и подайте
-            заявку заново.
-          </Alert>
-          {resubmit.error && (
-            <Alert>{formErrors(resubmit.error, 'Не удалось подать заявку').message}</Alert>
-          )}
-          <div className="flex flex-wrap gap-3">
-            <Button variant="secondary" onClick={() => setEditing(true)} disabled={editing}>
-              Исправить данные
-            </Button>
-            <Button loading={resubmit.isPending} onClick={() => resubmit.mutate()}>
-              {resubmit.isPending ? 'Отправляем…' : 'Подать заявку заново'}
-            </Button>
-          </div>
-        </Card>
-      )}
-      {org.status === 'approved' && (
-        <Card tone="success" className="flex flex-col gap-4">
-          <p className="font-semibold">
-            Организация допущена. Ваши события публикуются сразу, без повторной проверки.
-          </p>
-          <div className="flex flex-wrap gap-3">
-            <ButtonLink to="/events/new">Опубликовать событие</ButtonLink>
-            <ButtonLink to="/me/events" variant="secondary">
-              Наши события и заявки
-            </ButtonLink>
-            <ButtonLink to={`/organizations/${org.id}`} variant="secondary">
-              Публичная страница
-            </ButtonLink>
-          </div>
-        </Card>
-      )}
-
-      {saved && !editing && <Alert tone="success">Изменения сохранены</Alert>}
+      {saved && !editing && <Alert tone="success">{saved}</Alert>}
 
       {editing ? (
         <Card>
           <h2 className="text-h3 mb-4">Данные организации</h2>
           <OrganizationForm
             initial={org}
-            submitLabel="Сохранить"
-            pendingLabel="Сохраняем…"
-            pending={update.isPending}
-            requestError={message}
+            submitLabel={rejected ? 'Сохранить и подать заново' : 'Сохранить'}
+            pendingLabel={rejected ? 'Отправляем…' : 'Сохраняем…'}
+            pending={update.isPending || resubmit.isPending}
+            requestError={message ?? resubmitError}
             serverFields={fields}
             onSubmit={(body) =>
               update.mutate(body, {
                 onSuccess: () => {
-                  setEditing(false);
-                  setSaved(true);
+                  if (!rejected) return done('Изменения сохранены');
+                  // После отказа правка и повторная подача — одно действие, а не две кнопки.
+                  resubmit.mutate(undefined, {
+                    onSuccess: () => done('Заявка отправлена снова. Решение появится здесь.'),
+                  });
                 },
               })
             }
             onCancel={() => {
               update.reset();
+              resubmit.reset();
               setEditing(false);
             }}
           />
         </Card>
       ) : (
-        <Profile
-          org={org}
-          onEdit={() => {
-            setSaved(false);
-            setEditing(true);
-          }}
-        />
+        <div className={`grid items-start gap-6 ${side ? 'lg:grid-cols-2' : ''}`}>
+          <Profile org={org} onEdit={startEdit} />
+          {rejected && <Rejection reason={org.rejectionReason} onFix={startEdit} />}
+          {approved && <ReviewsPanel orgId={org.id} reviews={reviews.data} />}
+        </div>
       )}
     </div>
+  );
+}
+
+const dayMonthFormat = new Intl.DateTimeFormat('ru-RU', {
+  timeZone: EVENT_TIMEZONE,
+  day: 'numeric',
+  month: 'long',
+});
+
+const STATUS_TILES = {
+  approved: { tone: 'bg-status-success', icon: 'check', title: 'Допущена' },
+  pending: { tone: 'bg-status-warning', icon: 'clock', title: 'На проверке' },
+  rejected: { tone: 'bg-status-danger', icon: 'cross', title: 'Отклонена' },
+} as const satisfies Record<OrgStatus, { tone: string; icon: IconName; title: string }>;
+
+/** Плитка сводки: крупное слово или число сверху, пояснение под ним. */
+function Tile({ className = 'bg-surface', children }: { className?: string; children: ReactNode }) {
+  return (
+    <div
+      className={`flex flex-col gap-1.5 rounded-lg border-2 border-ink p-5 shadow-md ${className}`}
+    >
+      {children}
+    </div>
+  );
+}
+
+function BigValue({ children, size = 'text-[34px]' }: { children: ReactNode; size?: string }) {
+  return (
+    <span className={`font-display ${size} leading-tight font-bold tabular-nums`}>{children}</span>
+  );
+}
+
+/** Статус допуска одной плиткой — вместо полосы шагов и отдельного блока с той же фразой. */
+function StatusTile({ org }: { org: OrganizationOwner }) {
+  const tile = STATUS_TILES[org.status];
+  const since = org.reviewedAt ? `С ${dayMonthFormat.format(new Date(org.reviewedAt))} · ` : '';
+  const text =
+    org.status === 'approved'
+      ? `${since}встречи публикуются сразу, без проверки`
+      : org.status === 'pending'
+        ? 'Решение появится здесь. До него публиковать встречи нельзя.'
+        : 'Администратор вернул заявку на доработку.';
+  return (
+    <Tile className={tile.tone}>
+      <p className="flex items-center gap-3">
+        <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-surface">
+          <Icon name={tile.icon} size={22} />
+        </span>
+        {/* Слово длиннее цифры: «На проверке» должно влезть в плитку одной строкой. */}
+        <BigValue size="text-[30px]">{tile.title}</BigValue>
+      </p>
+      <p>{text}</p>
+    </Tile>
+  );
+}
+
+type ReviewsQuery = ReturnType<typeof useOrganizationReviews>;
+
+function RatingTile({ approved, reviews }: { approved: boolean; reviews: ReviewsQuery }) {
+  const summary = reviews.data?.summary;
+  if (approved && summary && summary.rating !== null) {
+    return (
+      <Tile>
+        <p className="flex flex-wrap items-center gap-3">
+          <BigValue>{formatRating(summary.rating)}</BigValue>
+          <Stars rating={summary.rating} size={24} />
+        </p>
+        <p className="text-ink-muted">Оценка участников · {plural(summary.count, REVIEWS)}</p>
+      </Tile>
+    );
+  }
+  const text = !approved
+    ? 'Оценки появятся после допуска и первых встреч'
+    : reviews.isPending
+      ? 'Загружаем отзывы…'
+      : !summary
+        ? 'Не удалось загрузить отзывы'
+        : summary.count > 0
+          ? `Отзывов пока ${summary.count}, оценка появится от ${RATING_MIN_REVIEWS}`
+          : 'Оценки появятся после первых встреч';
+  return (
+    <Tile>
+      <BigValue>—</BigValue>
+      <p className="text-ink-muted">{text}</p>
+    </Tile>
+  );
+}
+
+function MeetingsTile({
+  approved,
+  organized,
+  upcoming,
+}: {
+  approved: boolean;
+  organized: number | undefined;
+  upcoming: number | undefined;
+}) {
+  return (
+    <Tile>
+      <BigValue>{approved && organized !== undefined ? organized : '—'}</BigValue>
+      <p className="text-ink-muted">
+        {approved ? 'Проведено встреч' : 'Встречи появятся после допуска'}
+        {approved && upcoming ? (
+          <>
+            {' · '}
+            <Link to="/me/events">ещё {upcoming} впереди</Link>
+          </>
+        ) : null}
+      </p>
+    </Tile>
+  );
+}
+
+function Rejection({ reason, onFix }: { reason: string | null; onFix: () => void }) {
+  return (
+    <Card className="flex flex-col gap-4">
+      <h2 className="text-h3">Что исправить</h2>
+      <p className="whitespace-pre-line">
+        {reason ?? 'Администратор не указал причину. Проверьте данные и подайте заявку снова.'}
+      </p>
+      <Button className="self-start" onClick={onFix}>
+        Исправить и подать снова
+      </Button>
+    </Card>
+  );
+}
+
+const REVIEWS = ['отзыв', 'отзыва', 'отзывов'] as const;
+
+/** «Дружелюбная атмосфера ×2»: какие отметки участники ставят клубу чаще всего. */
+function tagCounts(items: Review[]) {
+  const counts = new Map<ReviewTag, number>();
+  for (const review of items) {
+    for (const tag of review.tags) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  return [...counts].sort((a, b) => b[1] - a[1]);
+}
+
+function ReviewsPanel({ orgId, reviews }: { orgId: string; reviews?: OrganizationReviews }) {
+  if (!reviews) return null;
+  const items = reviews.items.filter((review) => review.direction === 'participant_to_organizer');
+  if (items.length === 0) {
+    return (
+      <Card className="flex flex-col gap-2">
+        <h2 className="text-h3">Что отмечают участники</h2>
+        <p className="text-ink-muted">
+          Отзывов пока нет. Они появятся после встреч клуба, когда участники их оценят.
+        </p>
+      </Card>
+    );
+  }
+  const latest = items.filter((review) => review.comment).slice(0, 2);
+  return (
+    <Card className="flex flex-col gap-4">
+      <h2 className="text-h3">Что отмечают участники</h2>
+      <ul className="flex flex-wrap gap-2">
+        {tagCounts(items).map(([tag, count]) => (
+          <li key={tag}>
+            <Badge tone="success" icon={null}>
+              {REVIEW_TAG_LABELS[tag]}
+              {count > 1 ? ` ×${count}` : ''}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+      {latest.length > 0 && <ReviewItems items={latest} empty="" />}
+      <Link to={`/organizations/${orgId}`} className="self-start font-semibold">
+        Все отзывы на странице клуба →
+      </Link>
+    </Card>
   );
 }
 
@@ -184,10 +350,13 @@ function Profile({ org, onEdit }: { org: OrganizationOwner; onEdit: () => void }
         <dd className="break-words">{org.contacts ?? 'Не указаны'}</dd>
       </dl>
       <p className="whitespace-pre-line">{org.description}</p>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         {org.sports.map((sport) => (
           <SportTag key={sport.id} sport={sport} />
         ))}
+        <Link to={`/organizations/${org.id}`} className="font-semibold">
+          Публичная страница →
+        </Link>
       </div>
     </Card>
   );
