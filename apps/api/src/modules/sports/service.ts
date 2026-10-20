@@ -17,12 +17,29 @@ export const sportColumns = {
   isCustom: sports.isCustom,
 };
 
+/**
+ * Главные виды спорта в порядке важности. На главной при равном числе встреч идут первыми:
+ * иначе при одинаковой популярности решал бы алфавит, и «Зарядка во дворе» вытесняла бы футбол.
+ */
+const MAIN_SPORTS = [
+  'футбол',
+  'бег',
+  'баскетбол',
+  'волейбол',
+  'плавание',
+  'йога',
+  'велоспорт',
+  'шахматы',
+  'настольный теннис',
+];
+
 /** Экранировать % и _ для ILIKE, чтобы поиск «100%» не превращался в шаблон. */
 export const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
 
 /**
  * Стартовый список, затем добавленные пользователями; внутри — по алфавиту.
- * С top — только виды с предстоящими встречами, самые популярные первыми, не больше top.
+ * С top — только виды с предстоящими встречами, самые популярные первыми, при равенстве —
+ * главные (MAIN_SPORTS), не больше top.
  */
 export async function listSports(query: SportsQuery): Promise<Sport[]> {
   const conditions: SQL[] = [];
@@ -37,7 +54,16 @@ export async function listSports(query: SportsQuery): Promise<Sport[]> {
       .select(sportColumns)
       .from(sports)
       .where(sql`${upcomingCount} > 0`)
-      .orderBy(desc(upcomingCount), asc(sports.isCustom), asc(sports.name))
+      .orderBy(
+        desc(upcomingCount),
+        // Не из списка главных — после них; среди остальных стартовые раньше своих, по алфавиту.
+        sql`array_position(array[${sql.join(
+          MAIN_SPORTS.map((slug) => sql`${slug}`),
+          sql`, `,
+        )}]::text[], "sports"."slug") nulls last`,
+        asc(sports.isCustom),
+        asc(sports.name),
+      )
       .limit(query.top);
   }
   if (query.q) {
