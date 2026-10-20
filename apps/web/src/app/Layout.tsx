@@ -8,6 +8,7 @@ import { Footer } from './Footer';
 import { Logo } from './Logo';
 import { MainNav } from './MainNav';
 import { PageBackground } from './PageBackground';
+import { SportIllustration } from './SportIllustration';
 
 export function Layout() {
   const me = useMe();
@@ -38,7 +39,9 @@ export function Layout() {
         </div>
       </header>
 
-      <main className="page-container flex-1 py-6">
+      {/* relative: спортсмен над подвалом стоит у нижнего правого края содержимого. */}
+      <main className="page-container relative flex-1 py-6">
+        <SportIllustration />
         <Outlet />
       </main>
 
