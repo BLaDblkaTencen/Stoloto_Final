@@ -236,16 +236,20 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
       });
     };
 
-  /** Площадка подставляет свой адрес, пока человек не вписал другой. */
+  /**
+   * Выбрали площадку (на карте или в списке) — в поле её адрес: адрес выбранной метки виден сразу.
+   * Своя точка адрес не трогает: его вписали сами или его подставит AddressField по метке;
+   * адрес прежней площадки к ней не относится — убираем.
+   */
   const choosePlace = (place: PlaceValue) => {
     setForm((prev) => {
-      const previous = prev.place?.kind === 'venue' ? prev.place.venue.address : '';
-      const ownAddress = prev.address.trim() !== '' && prev.address !== previous;
-      const address = ownAddress
-        ? prev.address
-        : place?.kind === 'venue'
+      const venueAddress = prev.place?.kind === 'venue' ? prev.place.venue.address : null;
+      const address =
+        place?.kind === 'venue'
           ? place.venue.address
-          : '';
+          : prev.address === venueAddress
+            ? ''
+            : prev.address;
       return { ...prev, place, address };
     });
     setErrors(({ venueId: _venue, lat: _lat, address: _address, ...rest }) => rest);

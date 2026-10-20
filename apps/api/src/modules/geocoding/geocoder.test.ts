@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  addressOf,
   cleanAddress,
   createGeocoder,
   queryVariants,
@@ -78,6 +79,49 @@ describe('toPlace', () => {
 
   it('без названия и улицы — первая часть полного адреса', () => {
     expect(toPlace({ ...base, display_name: '660049, Красноярск, Россия' }).label).toBe('660049');
+  });
+});
+
+describe('addressOf', () => {
+  const at = { lat: '56.0425', lon: '92.9193' };
+
+  it('дом — улица и номер; координаты — та точка, что отметили, а не здание', () => {
+    const place = addressOf(
+      {
+        ...at,
+        address: {
+          road: 'улица Авиаторов',
+          house_number: '21',
+          quarter: 'Взлётка, микрорайон БЦ',
+          suburb: 'Советский район',
+        },
+      },
+      56.04251,
+      92.91931,
+    );
+    expect(place).toEqual({
+      label: 'улица Авиаторов, 21',
+      context: 'Советский район',
+      lat: 56.04251,
+      lng: 92.91931,
+    });
+  });
+
+  it('дом без улицы — с названием места: «остров Татышев, 3Г»', () => {
+    const address = { house_number: '3Г', neighbourhood: 'остров Татышев' };
+    expect(addressOf({ ...at, address }, 1, 2)?.label).toBe('остров Татышев, 3Г');
+  });
+
+  it('только улица — её название', () => {
+    expect(addressOf({ ...at, address: { road: 'проспект Мира' } }, 1, 2)?.label).toBe(
+      'проспект Мира',
+    );
+  });
+
+  it('ни дома, ни улицы (середина парка) — null, а не «Центральный район»', () => {
+    const address = { suburb: 'Центральный район', city_district: 'Центральный район' };
+    expect(addressOf({ ...at, address }, 1, 2)).toBeNull();
+    expect(addressOf({ ...at, address: { house_number: '10' } }, 1, 2)).toBeNull();
   });
 });
 
@@ -192,5 +236,33 @@ describe('createGeocoder', () => {
     const geocoder = createGeocoder({ baseUrl: null, fetch: send });
     await expect(geocoder.search('Покровский парк')).rejects.toMatchObject({ status: 503 });
     expect(send).not.toHaveBeenCalled();
+  });
+
+  it('адрес точки: ближайший дом (layer=address), точка та же; пусто — null', async () => {
+    const send = vi.fn(async (url: RequestInfo | URL) => {
+      const query = new URL(String(url)).searchParams;
+      return json(
+        query.get('lat') === '56.0425'
+          ? {
+              lat: '56.04241',
+              lon: '92.91944',
+              address: { road: 'улица Авиаторов', house_number: '21' },
+            }
+          : { error: 'Unable to geocode' },
+      );
+    });
+    const geocoder = createGeocoder({ baseUrl: 'https://n.test', fetch: send, minIntervalMs: 0 });
+
+    expect(await geocoder.reverse(56.0425, 92.9193)).toEqual({
+      label: 'улица Авиаторов, 21',
+      context: null,
+      lat: 56.0425,
+      lng: 92.9193,
+    });
+    const query = new URL(String(send.mock.calls[0][0])).searchParams;
+    expect(new URL(String(send.mock.calls[0][0])).pathname).toBe('/reverse');
+    expect(query.get('layer')).toBe('address');
+    expect(query.get('zoom')).toBe('18');
+    expect(await geocoder.reverse(0, 0)).toBeNull();
   });
 });
