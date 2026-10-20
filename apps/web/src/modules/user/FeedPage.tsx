@@ -720,28 +720,32 @@ const STEPS = [
   },
 ];
 
+/** «Как это работает»: отдельный раздел — двойной отступ от карты и видимый заголовок. */
 function Steps() {
+  const headingId = useId();
   return (
-    <section
-      aria-label="Как это работает"
-      className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]"
-    >
-      {STEPS.map((step, index) => (
-        <div
-          key={step.title}
-          className="flex flex-col gap-2 rounded-lg border-2 border-ink bg-surface p-6"
-        >
-          <span
-            aria-hidden="true"
-            className="inline-flex size-12 items-center justify-center rounded-full border-2 border-ink font-display text-[22px] font-bold"
-            style={{ background: step.color }}
+    <section aria-labelledby={headingId} className="mt-8 flex flex-col gap-5">
+      <h2 id={headingId} className="text-h2">
+        Как это работает
+      </h2>
+      <div className="grid gap-5 [grid-template-columns:repeat(auto-fit,minmax(260px,1fr))]">
+        {STEPS.map((step, index) => (
+          <div
+            key={step.title}
+            className="flex flex-col gap-2 rounded-lg border-2 border-ink bg-surface p-6"
           >
-            {index + 1}
-          </span>
-          <h3 className="text-h3">{step.title}</h3>
-          <p className="text-ink-muted">{step.text}</p>
-        </div>
-      ))}
+            <span
+              aria-hidden="true"
+              className="inline-flex size-12 items-center justify-center rounded-full border-2 border-ink font-display text-[22px] font-bold"
+              style={{ background: step.color }}
+            >
+              {index + 1}
+            </span>
+            <h3 className="text-h3">{step.title}</h3>
+            <p className="text-ink-muted">{step.text}</p>
+          </div>
+        ))}
+      </div>
     </section>
   );
 }
