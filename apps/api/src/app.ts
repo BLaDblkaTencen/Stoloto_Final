@@ -42,6 +42,8 @@ export async function buildApp() {
         connectSrc: ["'self'"],
       },
     },
+    // Сервер плиток OSM отказывает запросам без Referer, а helmet по умолчанию шлёт no-referrer.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   });
   await app.register(cookie);
   // Лимит включается на конкретных маршрутах (вход, регистрация): config.rateLimit.

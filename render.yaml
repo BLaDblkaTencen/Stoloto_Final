@@ -1,0 +1,33 @@
+# Деплой на Render одним Blueprint: Dashboard → New → Blueprint → этот репозиторий.
+# Бесплатный Postgres Render живёт 30 дней с момента создания (затем 14 дней отсрочки
+# и удаление) — на время проверки финала этого хватает.
+databases:
+  - name: vmeste-db
+    plan: free
+    region: frankfurt
+    postgresMajorVersion: '17'
+    databaseName: sport
+    user: sport
+
+services:
+  - type: web
+    name: vmeste
+    runtime: node
+    plan: free
+    # База и сервис в одном регионе: иначе внутренний адрес базы не резолвится.
+    region: frankfurt
+    branch: main
+    # db:push здесь, а не в pre-deploy: pre-deploy на бесплатном тарифе недоступен.
+    buildCommand: pnpm install --frozen-lockfile && pnpm build && pnpm db:push --force
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: vmeste-db
+          property: connectionString
+      # Сид при старте наполняет базу, только если SEED_VERSION в коде новее записанной.
+      - key: SEED_ON_START
+        value: 'true'
+      - key: NODE_VERSION
+        value: '24'
