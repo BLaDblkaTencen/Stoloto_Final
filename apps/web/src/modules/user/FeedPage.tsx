@@ -136,7 +136,9 @@ export function FeedPage() {
   ];
 
   return (
-    <div className="flex flex-col gap-8">
+    // pb-6: зазор до подвала один для всех — у гостя страница кончается «Клуб или сообщество?»,
+    // у вошедшего — лентой с картой.
+    <div className="flex flex-col gap-8 pb-6">
       <HomeHero
         sports={sports}
         sportId={params.sportId}
@@ -757,7 +759,7 @@ function OrgInvite() {
   const me = useMe();
   if (me.isPending || me.data) return null;
   return (
-    <section className="mb-6 flex flex-wrap items-center justify-between gap-6 rounded-xl border-2 border-ink bg-status-request p-6 shadow-lg md:p-9">
+    <section className="flex flex-wrap items-center justify-between gap-6 rounded-xl border-2 border-ink bg-status-request p-6 shadow-lg md:p-9">
       <div className="min-w-0 flex-[1_1_440px]">
         <h2 className="text-h2 mb-2">Клуб или сообщество?</h2>
         <p className="text-lg">
