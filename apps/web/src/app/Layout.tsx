@@ -5,13 +5,16 @@ import { AccountMenu } from '../modules/auth/AccountMenu';
 import { useMe } from '../modules/auth/api';
 import { ButtonLink, Icon } from '../shared/ui';
 import { MainNav } from './MainNav';
+import { PageBackground } from './PageBackground';
 
 export function Layout() {
   const me = useMe();
   // Создать встречу может участник и организация; гостя форма сначала попросит войти.
   const canCreate = !me.isPending && me.data?.role !== 'admin';
   return (
-    <div className="flex min-h-screen flex-col">
+    // isolate: фон с -z-10 остаётся внутри раскладки, под содержимым, но над фоном body.
+    <div className="isolate flex min-h-screen flex-col">
+      <PageBackground />
       <header className="page-container flex flex-wrap items-center justify-between gap-4 py-5">
         {/* Логотип не перекрашивается при наведении, как обычные ссылки (a:hover в index.css). */}
         <Link to="/" className="flex items-center gap-2.5 no-underline hover:text-ink">
