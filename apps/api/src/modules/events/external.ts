@@ -5,6 +5,8 @@ import type { SessionUser } from '../auth/session';
 import { resolvePublishingOrganization } from '../organizations/service';
 
 export { findVenueCard as findVenue, resolveVenueForEvent } from '../venues/service';
+// Точка по адресу для встречи без площадки и без точки на карте — чтобы она попала на карту.
+export { locateAddress } from '../geocoding/geocoder';
 
 /** Организация, от имени которой аккаунт organization публикует событие; должна быть допущена. */
 export async function publishingOrganizationId(tx: Tx, user: SessionUser): Promise<string> {

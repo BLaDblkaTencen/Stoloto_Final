@@ -19,7 +19,12 @@ import { AppError, errors } from '../../lib/errors';
 import type { SessionUser } from '../auth/session';
 import { attendanceStates, organizerSummary } from '../reviews/service';
 import { resolveSport } from '../sports/service';
-import { findVenue, publishingOrganizationId, resolveVenueForEvent } from './external';
+import {
+  findVenue,
+  locateAddress,
+  publishingOrganizationId,
+  resolveVenueForEvent,
+} from './external';
 import { confirmedCount, feedConditions, selectEvents, toListItem } from './queries';
 import {
   canSeeChat,
@@ -211,6 +216,14 @@ async function resolvePlace(
   };
 }
 
+/**
+ * Своя точка без координат (вписали только адрес): ищем адрес на карте (участник 2), чтобы
+ * встреча попала на карту. До транзакции: внешний запрос не должен держать её открытой.
+ */
+async function locateIfNoPoint(address: string | undefined, lat: number | null | undefined) {
+  return lat == null && address ? locateAddress(address) : null;
+}
+
 const startsInFuture = (startsAt: Date) => {
   if (startsAt.getTime() <= Date.now()) {
     throw errors.validation({ startsAt: 'Начало должно быть в будущем' });
@@ -220,6 +233,7 @@ const startsInFuture = (startsAt: Date) => {
 /** Создать событие. Аккаунт организации публикует только от имени своей допущенной организации. */
 export async function createEvent(input: CreateEventData, user: SessionUser): Promise<string> {
   startsInFuture(input.startsAt);
+  const located = input.venueId ? null : await locateIfNoPoint(input.address, input.lat);
   return db.transaction(async (tx) => {
     const sport = await resolveSport(tx, input, user.id);
     const organizationId =
@@ -231,8 +245,8 @@ export async function createEvent(input: CreateEventData, user: SessionUser): Pr
             venueId: null,
             // Без площадки адрес обязателен: это проверила схема createEventSchema.
             address: input.address ?? '',
-            lat: input.lat ?? null,
-            lng: input.lng ?? null,
+            lat: input.lat ?? located?.lat ?? null,
+            lng: input.lng ?? located?.lng ?? null,
           },
     );
     const [created] = await tx
@@ -263,6 +277,7 @@ export async function createEvent(input: CreateEventData, user: SessionUser): Pr
  * лимит не ниже числа участников, режим записи — только пока записей нет.
  */
 export async function updateEvent(id: string, input: UpdateEventData, user: SessionUser) {
+  const located = input.venueId ? null : await locateIfNoPoint(input.address, input.lat);
   await db.transaction(async (tx) => {
     // Блокировка строки: параллельная запись не проскочит между проверкой лимита и правкой.
     const [current] = await tx.select().from(events).where(eq(events.id, id)).for('update');
@@ -323,8 +338,8 @@ export async function updateEvent(id: string, input: UpdateEventData, user: Sess
       : {
           venueId: null,
           address: input.address ?? current.address,
-          lat: input.lat !== undefined ? input.lat : current.lat,
-          lng: input.lng !== undefined ? input.lng : current.lng,
+          lat: (input.lat !== undefined ? input.lat : current.lat) ?? located?.lat ?? null,
+          lng: (input.lng !== undefined ? input.lng : current.lng) ?? located?.lng ?? null,
         };
 
     await tx

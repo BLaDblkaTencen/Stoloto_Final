@@ -7,6 +7,7 @@ import auth from './auth/routes';
 import comments from './comments/routes';
 import core from './core/routes';
 import events from './events/routes';
+import geocoding from './geocoding/routes';
 import organizations from './organizations/routes';
 import organizerPanel from './organizer-panel/routes';
 import profiles from './profiles/routes';
@@ -28,6 +29,7 @@ const modules = [
   organizations,
   organizerPanel,
   venues,
+  geocoding,
 ];
 
 export async function registerModules(app: FastifyInstance) {

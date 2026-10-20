@@ -1,9 +1,11 @@
 // Запросы карты «Место встречи». Владелец: участник 2. Контракт — docs/api/organizations.md, раздел 3.
 import type { EventLevel, JoinMode } from '@sport/shared';
 import type { EventMapItem } from '@sport/shared/schemas/events';
+import type { GeocodeResponse } from '@sport/shared/schemas/geocoding';
 import { formatBbox, type Bbox, type Venue, type VenueCard } from '@sport/shared/schemas/venues';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { api } from '../../../shared/api/client';
+import { queryClient } from '../../../shared/api/queryClient';
 
 const search = (params: Record<string, string | undefined>) => {
   const query = new URLSearchParams();
@@ -72,5 +74,17 @@ export function useEventsOnMap(bbox: Bbox | null, filters: EventsMapFilters) {
     enabled: bboxParam !== undefined,
     placeholderData: keepPreviousData,
     select: (data) => data.items,
+  });
+}
+
+// Поиск адреса (GET /api/geocode). Не хук: форма ищет после паузы в наборе или по Enter, а не
+// на каждую букву. Через кэш запросов: тот же адрес второй раз не уходит на сервер.
+
+/** Места в Красноярске по адресу, лучшее первым; пустой список — не нашли. */
+export function geocodeAddress(q: string) {
+  return queryClient.fetchQuery({
+    queryKey: ['geocode', q],
+    queryFn: () => api<GeocodeResponse>(`/geocode?${search({ q })}`),
+    staleTime: Infinity,
   });
 }

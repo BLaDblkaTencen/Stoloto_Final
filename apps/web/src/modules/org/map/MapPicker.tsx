@@ -3,34 +3,51 @@
 //   const [place, setPlace] = useState<PlaceValue>(null);
 //   <MapPicker sportId={form.sportId} value={place} onChange={setPlace} />
 //   // place.kind === 'venue' → venueId = place.venue.id, адрес можно подставить из place.venue.address
-//   // place.kind === 'point' → lat, lng; адрес человек пишет сам
+//   // place.kind === 'point' → lat, lng; адрес человек пишет сам или его подставит AddressField
 //
 // Карта грузится лениво. Список площадок под картой работает и без неё: для клавиатуры,
 // экранного диктора и на случай, если карта не загрузилась.
 import { VENUE_TYPE_LABELS } from '@sport/shared';
+import type { GeocodePlace } from '@sport/shared/schemas/geocoding';
 import type { Venue, VenueCard as VenueInfo } from '@sport/shared/schemas/venues';
 import { lazy } from 'react';
 import { Alert, Button, SelectField, VenueCard } from '../../../shared/ui';
 import { useVenues } from './api';
 import { MapBoundary } from './MapBoundary';
+import type { PlaceDraft } from './PickerMap';
 import { venueCardData } from './venueCardData';
 
 export type PlaceValue =
-  { kind: 'venue'; venue: VenueInfo } | { kind: 'point'; lat: number; lng: number } | null;
+  | { kind: 'venue'; venue: VenueInfo }
+  /** found — точку поставил поиск адреса (AddressField): карта приближается к ней. */
+  | { kind: 'point'; lat: number; lng: number; found?: GeocodePlace }
+  | null;
 
 export type MapPickerProps = {
   /** Вид спорта события: подходящие ему площадки подсвечиваются. */
   sportId?: string;
   value: PlaceValue;
   onChange: (value: PlaceValue) => void;
+  /** Адрес из поля формы: подпись над меткой встречи на карте. */
+  address?: string;
+  /** Что уже выбрано в форме (вид спорта, режим записи, название): по этому рисуется метка. */
+  draft?: PlaceDraft;
   /** Ошибка поля venueId или координат от сервера. */
   error?: string;
 };
 
 const PickerMap = lazy(() => import('./PickerMap'));
 const MAP_HEIGHT = 'h-[420px] md:h-[520px]';
+const NO_DRAFT: PlaceDraft = { sportSlug: null, joinMode: '', title: '' };
 
-export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
+export function MapPicker({
+  sportId,
+  value,
+  onChange,
+  address = '',
+  draft = NO_DRAFT,
+  error,
+}: MapPickerProps) {
   const venues = useVenues(sportId);
   const items = venues.data ?? [];
   const hasHint = sportId !== undefined && items.some((venue) => venue.suitable === false);
@@ -41,16 +58,19 @@ export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
     <div className="flex flex-col gap-4">
       <p className="text-ink-muted">
         {hasHint
-          ? 'Жёлтые метки — площадки, подходящие для этого вида спорта, серые — остальные. '
-          : 'Метки — площадки, где можно договориться о встрече. '}
-        Нажмите на метку, чтобы выбрать площадку, или на свободное место карты, чтобы поставить свою
-        точку (двор, парк).
+          ? 'Квадратные метки — площадки: жёлтые подходят этому виду спорта, серые — остальные. '
+          : 'Квадратные метки — площадки, где можно договориться о встрече. '}
+        Нажмите на площадку, чтобы выбрать её, или на свободное место карты, чтобы поставить свою
+        точку. Пунктирная метка — ваша встреча: так её увидят на карте после публикации, свою точку
+        можно перетащить.
       </p>
 
       <MapBoundary className={MAP_HEIGHT}>
         <PickerMap
           venues={items}
           value={value}
+          address={address}
+          draft={draft}
           onPickVenue={pickVenue}
           onPickPoint={(lat, lng) => onChange({ kind: 'point', lat, lng })}
         />
@@ -92,8 +112,10 @@ export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
         <div className="flex flex-col gap-3 rounded-lg border-2 border-ink bg-surface p-5">
           <p className="font-semibold">Своя точка на карте</p>
           <p className="text-ink-muted">
-            Опишите место в поле «Адрес», чтобы участники точно нашли вас: например «у главного
-            входа в парк, возле фонтана».
+            {value.found
+              ? 'Поставили по адресу. Не там — нажмите на карту, где вы встречаетесь. '
+              : 'Стоит там, где вы нажали на карту. '}
+            Ориентир можно добавить в поле «Как найти»: например «у главного входа, возле фонтана».
           </p>
           <Button variant="secondary" className="self-start" onClick={() => onChange(null)}>
             Убрать точку
