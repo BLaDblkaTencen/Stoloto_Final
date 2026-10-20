@@ -1,4 +1,9 @@
-import { normalizeSportName, sportNameSchema, sportSlug } from '@sport/shared/schemas/sports';
+import {
+  normalizeSportName,
+  sportNameSchema,
+  sportSlug,
+  sportsQuerySchema,
+} from '@sport/shared/schemas/sports';
 import { describe, expect, it } from 'vitest';
 
 describe('свой вид спорта', () => {
@@ -30,5 +35,14 @@ describe('свой вид спорта', () => {
     expect(sportNameSchema.safeParse(' а ').success).toBe(false);
     expect(sportNameSchema.safeParse('!!!').success).toBe(false);
     expect(sportNameSchema.safeParse('х'.repeat(41)).success).toBe(false);
+  });
+});
+
+describe('популярные виды спорта для главной', () => {
+  it('top — целое число от 1 до 20, из строки адреса', () => {
+    expect(sportsQuerySchema.parse({ top: '6' })).toEqual({ top: 6 });
+    expect(sportsQuerySchema.safeParse({ top: '0' }).success).toBe(false);
+    expect(sportsQuerySchema.safeParse({ top: '21' }).success).toBe(false);
+    expect(sportsQuerySchema.safeParse({ top: 'шесть' }).success).toBe(false);
   });
 });

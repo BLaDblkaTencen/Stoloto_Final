@@ -5,7 +5,7 @@ import {
   type Sport,
   type SportsQuery,
 } from '@sport/shared/schemas/sports';
-import { and, asc, eq, exists, gt, ilike, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, exists, gt, ilike, sql, type SQL } from 'drizzle-orm';
 import { db, type Tx } from '../../db/client';
 import { events, sports } from '../../db/schema';
 import { errors } from '../../lib/errors';
@@ -20,9 +20,26 @@ export const sportColumns = {
 /** Экранировать % и _ для ILIKE, чтобы поиск «100%» не превращался в шаблон. */
 export const escapeLike = (text: string) => text.replace(/[\\%_]/g, '\\$&');
 
-/** Стартовый список, затем добавленные пользователями; внутри — по алфавиту. */
+/**
+ * Стартовый список, затем добавленные пользователями; внутри — по алфавиту.
+ * С top — только виды с предстоящими встречами, самые популярные первыми, не больше top.
+ */
 export async function listSports(query: SportsQuery): Promise<Sport[]> {
   const conditions: SQL[] = [];
+  if (query.top) {
+    // Запрос к одной таблице sports: Drizzle пишет её колонки без имени таблицы, поэтому
+    // подзапрос ссылается на "sports"."id" явно, иначе "id" достался бы таблице events.
+    const upcomingCount = sql<number>`(
+      select count(*)::int from ${events} e
+      where e.sport_id = "sports"."id" and e.status = 'published' and e.starts_at > now()
+    )`;
+    return db
+      .select(sportColumns)
+      .from(sports)
+      .where(sql`${upcomingCount} > 0`)
+      .orderBy(desc(upcomingCount), asc(sports.isCustom), asc(sports.name))
+      .limit(query.top);
+  }
   if (query.q) {
     conditions.push(ilike(sports.slug, `%${escapeLike(sportSlug(query.q))}%`));
   }
