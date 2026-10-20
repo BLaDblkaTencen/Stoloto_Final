@@ -8,6 +8,7 @@ import { useLocation } from 'react-router';
 import { ApiError } from '../../shared/api/client';
 import {
   Alert,
+  Badge,
   Button,
   ButtonLink,
   Card,
@@ -29,6 +30,10 @@ const STATUS_TEXT = {
   cancelled: 'Вы отменили запись.',
 } as const;
 
+/** Заявка, на которую организатор не ответил до начала встречи. Общая с «Моими мероприятиями». */
+export const MISSED_LABEL = 'Заявка не рассмотрена';
+export const MISSED_TEXT = 'Встреча уже прошла, а организатор так и не ответил на заявку.';
+
 export function JoinPanel({ event }: { event: EventDetails }) {
   const location = useLocation();
   const join = useJoinEvent(event.id);
@@ -43,6 +48,8 @@ export function JoinPanel({ event }: { event: EventDetails }) {
   if (permissions.isOrganizer) return null;
 
   const cancelLabel = my?.status === 'pending' ? 'Отозвать заявку' : 'Отменить запись';
+  // Организатор не ответил до начала: решить по заявке сервер уже не даст, «ждёт решения» — неправда.
+  const missed = my?.status === 'pending' && event.isPast;
 
   return (
     <Card className="flex flex-col gap-4">
@@ -51,8 +58,14 @@ export function JoinPanel({ event }: { event: EventDetails }) {
 
       {my && (
         <div className="flex flex-col items-start gap-2">
-          <StatusBadge kind="registration" status={my.status} />
-          <p>{STATUS_TEXT[my.status]}</p>
+          {missed ? (
+            <Badge tone="neutral" icon="clock">
+              {MISSED_LABEL}
+            </Badge>
+          ) : (
+            <StatusBadge kind="registration" status={my.status} />
+          )}
+          <p>{missed ? MISSED_TEXT : STATUS_TEXT[my.status]}</p>
           {my.message && my.status === 'pending' && (
             <p className="text-sm text-ink-muted">Ваше сообщение: «{my.message}»</p>
           )}
@@ -137,9 +150,11 @@ export function JoinPanel({ event }: { event: EventDetails }) {
         }
       >
         <p>
-          {event.capacity !== null && my?.status === 'confirmed'
-            ? 'Место освободится, и его сможет занять другой человек.'
-            : 'Записаться снова можно, пока есть места.'}
+          {event.registrationClosed
+            ? 'Организатор закрыл запись: вернуться на эту встречу уже не получится.'
+            : event.capacity !== null && my?.status === 'confirmed'
+              ? 'Место освободится, и его сможет занять другой человек.'
+              : 'Записаться снова можно, пока есть места.'}
         </p>
       </Modal>
     </Card>
