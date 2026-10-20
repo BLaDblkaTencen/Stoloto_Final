@@ -1,6 +1,6 @@
 // Шапка главной, вариант Б2: площадка меняется под выбранный вид спорта — поле, дорожка,
 // бассейн, паркет, доска, стол, коврик, а свой вид спорта — площадка с фишками. Вместе с ней
-// меняется заголовок. Макет: https://claude.ai/artifact/HsM35b8katSxSbGx4qGFfS
+// меняется заголовок.
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { ReactNode } from 'react';
 import { Icon, sportColor, sportIcon, type IconName } from '../../shared/ui';
