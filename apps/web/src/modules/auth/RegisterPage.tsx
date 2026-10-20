@@ -29,7 +29,12 @@ export function RegisterPage() {
   const [form, setForm] = useState({ name: '', email: '', password: '', role: presetRole });
   const [fields, setFields] = useState<Record<string, string>>({});
 
-  if (me.data) return <Navigate to={next} replace />;
+  // Организацию после регистрации ведём в кабинет — заполнить данные и подать заявку,
+  // а не на главную, где непонятно, что делать дальше.
+  const landing = (role: string) =>
+    role === 'organization' && !next.startsWith('/org') ? '/org' : next;
+
+  if (me.data) return <Navigate to={landing(me.data.role)} replace />;
 
   const set = (key: keyof typeof form) => (value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -40,7 +45,7 @@ export function RegisterPage() {
     if (!parsed.success) return setFields(zodFieldErrors(parsed.error));
     setFields({});
     register.mutate(parsed.data, {
-      onSuccess: () => navigate(next, { replace: true }),
+      onSuccess: ({ user }) => navigate(user ? landing(user.role) : next, { replace: true }),
       onError: (error) => {
         if (error instanceof ApiError) setFields(error.fields);
       },
