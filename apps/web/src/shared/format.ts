@@ -1,15 +1,12 @@
-// Даты для интерфейса: по местному времени Красноярска, как в мероприятиях (EVENT_TIMEZONE).
-import { EVENT_TIMEZONE } from '@sport/shared/schemas/events';
+// Даты для интерфейса: в поясе устройства, как и время мероприятий (modules/user/format.ts).
 
 const dateTime = new Intl.DateTimeFormat('ru-RU', {
-  timeZone: EVENT_TIMEZONE,
   day: 'numeric',
   month: 'long',
   hour: '2-digit',
   minute: '2-digit',
 });
 const date = new Intl.DateTimeFormat('ru-RU', {
-  timeZone: EVENT_TIMEZONE,
   day: 'numeric',
   month: 'long',
   year: 'numeric',

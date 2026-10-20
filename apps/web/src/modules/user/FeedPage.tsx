@@ -37,6 +37,7 @@ import {
   eventDay,
   formatDayHeading,
   formatShort,
+  DEVICE_TIMEZONE,
   formatTime,
   isoDay,
   LOCAL_TIME_NOTE,
@@ -51,19 +52,24 @@ const WHEN_OPTIONS = [
   { value: 'weekend', label: 'Выходные' },
 ] as const;
 
-/** Диапазон дат по Красноярску для значения «Когда». */
-function whenRange(when: string | null): Pick<FeedParams, 'dateFrom' | 'dateTo'> {
+/** Диапазон дат на устройстве для значения «Когда»: сервер считает сутки в том же поясе (tz). */
+function whenRange(when: string | null): Pick<FeedParams, 'dateFrom' | 'dateTo' | 'tz'> {
+  const range = (from: number, to: number) => ({
+    dateFrom: isoDay(from),
+    dateTo: isoDay(to),
+    tz: DEVICE_TIMEZONE,
+  });
   switch (when) {
     case 'today':
-      return { dateFrom: isoDay(0), dateTo: isoDay(0) };
+      return range(0, 0);
     case 'tomorrow':
-      return { dateFrom: isoDay(1), dateTo: isoDay(1) };
+      return range(1, 1);
     case 'week':
-      return { dateFrom: isoDay(0), dateTo: isoDay(6) };
+      return range(0, 6);
     case 'weekend': {
       const weekday = new Date(`${isoDay(0)}T00:00:00Z`).getUTCDay(); // 0 — воскресенье
       const toSaturday = weekday === 0 ? -1 : 6 - weekday;
-      return { dateFrom: isoDay(Math.max(0, toSaturday)), dateTo: isoDay(toSaturday + 1) };
+      return range(Math.max(0, toSaturday), toSaturday + 1);
     }
     default:
       return {};
