@@ -426,28 +426,25 @@ function EventsSplit({
           />
         )}
         {(wide || view === 'map') && (
-          <div className="flex min-w-0 flex-col gap-2">
+          // Легенда и ссылка на большую карту лежат внутри рамки карты, в нижних углах: под картой
+          // строка легенды терялась. Справа снизу остаётся место для подписи «© OpenStreetMap».
+          <div className="min-w-0">
             <EventsMap
               filters={params}
               selectedId={selectedId}
               onSelect={selectFromMap}
               focus={focus}
               className="h-[70vh] min-h-[420px] lg:h-[min(780px,calc(100dvh_-_7rem))]"
+              overlay={
+                // На телефоне кнопка стоит над легендой, на широком экране — в соседнем углу.
+                <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[1000] flex flex-col-reverse items-start gap-2 sm:flex-row sm:items-end sm:justify-between">
+                  <MapLegend />
+                  <ButtonLink to="/map" variant="secondary" className="pointer-events-auto sm:mb-4">
+                    Большая карта →
+                  </ButtonLink>
+                </div>
+              }
             />
-            <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-              <span className="flex flex-wrap items-center gap-3 font-semibold">
-                Цвет — вид спорта
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="inline-flex size-[22px] items-center justify-center rounded-full bg-ink text-white">
-                    <Icon name="lock" size={12} strokeWidth={2.6} />
-                  </span>
-                  по заявке
-                </span>
-              </span>
-              <Link to="/map" className="font-semibold">
-                Большая карта с площадками →
-              </Link>
-            </div>
           </div>
         )}
       </div>
@@ -768,5 +765,41 @@ function OrgInvite() {
         {role ? 'Кабинет организации' : 'Подать заявку'}
       </ButtonLink>
     </section>
+  );
+}
+
+/** Легенда карты в её левом нижнем углу: те же значки, что на метках. */
+function MapLegend() {
+  return (
+    <ul
+      aria-label="Обозначения на карте"
+      className="pointer-events-auto flex flex-col gap-1.5 rounded-lg border-2 border-ink bg-surface px-3.5 py-2.5 text-sm shadow-sm"
+    >
+      <li className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="ml-0.5 size-3.5 rotate-[-45deg] rounded-[50%_50%_50%_0] border-2 border-ink bg-[var(--sport-2)]"
+        />
+        встреча, цвет — вид спорта
+      </li>
+      <li className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="inline-flex size-[18px] items-center justify-center rounded-full bg-ink text-white"
+        >
+          <Icon name="lock" size={10} strokeWidth={2.8} />
+        </span>
+        по заявке
+      </li>
+      <li className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className="inline-flex size-[18px] items-center justify-center rounded-full border-2 border-ink bg-[conic-gradient(var(--sport-4)_0_50%,var(--sport-3)_0)]"
+        >
+          <span className="size-2 rounded-full bg-surface" />
+        </span>
+        несколько встреч рядом
+      </li>
+    </ul>
   );
 }

@@ -6,7 +6,7 @@
 // Карта сама запрашивает события в видимой области; адрес каждой встречи остаётся в списке ленты,
 // поэтому без карты лента работает как обычно.
 import { formatBbox, type Bbox, type Venue } from '@sport/shared/schemas/venues';
-import { lazy, useCallback, useMemo, useState } from 'react';
+import { lazy, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useMe } from '../../auth/api';
 import { useSports } from '../api';
 import { roundBbox, useEventsOnMap, useVenues, type EventsMapFilters } from './api';
@@ -27,6 +27,8 @@ export type EventsMapProps = {
   focus?: MapFocus;
   /** Высота классом Tailwind. */
   className?: string;
+  /** Что положить поверх карты (легенда, кнопки): позиционируется по рамке карты. */
+  overlay?: ReactNode;
 };
 
 export function EventsMap({
@@ -36,6 +38,7 @@ export function EventsMap({
   onSelect,
   focus,
   className = 'h-[480px]',
+  overlay,
 }: EventsMapProps) {
   const [bbox, setBbox] = useState<Bbox | null>(null);
   // Состояние меняется, только когда округлённая область другая: сдвиг карты на пиксели
@@ -69,19 +72,22 @@ export function EventsMap({
 
   return (
     <div className="flex flex-col gap-2">
-      <MapBoundary className={className}>
-        <EventsMapView
-          events={events.data ?? []}
-          sportsById={sportsById}
-          venues={showVenues ? (venues.data ?? []) : []}
-          createHref={createHref}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          focus={focus}
-          onBoundsChange={onBoundsChange}
-          className={className}
-        />
-      </MapBoundary>
+      <div className="relative">
+        <MapBoundary className={className}>
+          <EventsMapView
+            events={events.data ?? []}
+            sportsById={sportsById}
+            venues={showVenues ? (venues.data ?? []) : []}
+            createHref={createHref}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            focus={focus}
+            onBoundsChange={onBoundsChange}
+            className={className}
+          />
+        </MapBoundary>
+        {overlay}
+      </div>
       <p aria-live="polite" className="text-sm text-ink-muted">
         {events.isError
           ? 'Не удалось загрузить встречи на карте'
