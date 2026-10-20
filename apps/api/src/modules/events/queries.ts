@@ -34,6 +34,7 @@ export const listFields = {
   joinMode: events.joinMode,
   level: events.level,
   capacity: events.capacity,
+  registrationClosed: events.registrationClosed,
   status: events.status,
   moderationReason: events.moderationReason,
   createdBy: events.createdBy,
@@ -140,6 +141,7 @@ export function toListItem(row: ListRow): EventListItem {
     capacity: row.capacity,
     participantsCount: row.participantsCount,
     freeSlots: row.capacity === null ? null : Math.max(0, row.capacity - row.participantsCount),
+    registrationClosed: row.registrationClosed,
     organizer: row.organizationId
       ? { type: 'organization', id: row.organizationId, name: row.organizationName ?? '' }
       : { type: 'user', id: row.createdBy, name: row.authorName },

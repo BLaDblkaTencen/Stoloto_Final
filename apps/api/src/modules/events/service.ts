@@ -357,6 +357,7 @@ export async function updateEvent(id: string, input: UpdateEventData, user: Sess
         requirements: input.requirements,
         capacity: input.capacity,
         chatUrl: input.chatUrl,
+        registrationClosed: input.registrationClosed,
       })
       .where(eq(events.id, id));
   });

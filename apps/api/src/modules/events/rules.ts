@@ -10,6 +10,7 @@ export type RuleEvent = {
   createdBy: string;
   joinMode: JoinMode;
   capacity: number | null;
+  registrationClosed: boolean;
 };
 
 /** Кто смотрит; null — не вошёл. */
@@ -88,6 +89,10 @@ export function joinDenial(
       code: 'REGISTRATION_REJECTED',
       message: 'Организатор отклонил вашу заявку',
     };
+  }
+  // После проверок своей записи: записанный видит «Вы уже записаны», а не «Запись закрыта».
+  if (event.registrationClosed) {
+    return { status: 409, code: 'REGISTRATION_CLOSED', message: 'Организатор закрыл запись' };
   }
   // Заявка на заполненное событие тоже бессмысленна: принять её организатор не сможет.
   if (event.capacity !== null && participantsCount >= event.capacity) {
