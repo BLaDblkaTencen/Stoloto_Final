@@ -19,13 +19,15 @@ export function PlaceMap({ className = 'h-[260px]', ...props }: PlaceMapViewProp
       <MapBoundary className={className}>
         <PlaceMapView {...props} className={className} />
       </MapBoundary>
+      {/* Ссылка уводит на чужой сайт в новой вкладке — так и подписана, чтобы не обещать нашу карту. */}
       <a
         href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`}
         target="_blank"
         rel="noreferrer"
-        className="self-start text-sm font-semibold"
+        className="tap-area self-start text-sm font-semibold"
       >
-        Открыть на большой карте
+        Открыть место на OpenStreetMap <span aria-hidden="true">↗</span>
+        <span className="sr-only"> (в новой вкладке)</span>
       </a>
     </div>
   );

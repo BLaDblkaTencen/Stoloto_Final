@@ -34,6 +34,16 @@ const STATUS_TEXT = {
 export const MISSED_LABEL = 'Заявка не рассмотрена';
 export const MISSED_TEXT = 'Встреча уже прошла, а организатор так и не ответил на заявку.';
 
+/**
+ * Заявку отозвали, пока организатор не ответил: «Запись отменена» тут неточно — записи не было.
+ * Принятая заявка получает decidedAt, поэтому её отмена остаётся отменой записи.
+ */
+export const WITHDRAWN_LABEL = 'Заявка отозвана';
+export const isWithdrawn = (
+  joinMode: EventDetails['joinMode'],
+  registration: { status: string; decidedAt: string | null } | null,
+) => joinMode === 'request' && registration?.status === 'cancelled' && !registration.decidedAt;
+
 export function JoinPanel({ event }: { event: EventDetails }) {
   const location = useLocation();
   const join = useJoinEvent(event.id);
@@ -50,6 +60,7 @@ export function JoinPanel({ event }: { event: EventDetails }) {
   const cancelLabel = my?.status === 'pending' ? 'Отозвать заявку' : 'Отменить запись';
   // Организатор не ответил до начала: решить по заявке сервер уже не даст, «ждёт решения» — неправда.
   const missed = my?.status === 'pending' && event.isPast;
+  const withdrawn = isWithdrawn(event.joinMode, my);
 
   return (
     <Card className="flex flex-col gap-4">
@@ -62,10 +73,12 @@ export function JoinPanel({ event }: { event: EventDetails }) {
             <Badge tone="neutral" icon="clock">
               {MISSED_LABEL}
             </Badge>
+          ) : withdrawn ? (
+            <Badge tone="neutral">{WITHDRAWN_LABEL}</Badge>
           ) : (
             <StatusBadge kind="registration" status={my.status} />
           )}
-          <p>{missed ? MISSED_TEXT : STATUS_TEXT[my.status]}</p>
+          <p>{missed ? MISSED_TEXT : withdrawn ? 'Вы отозвали заявку.' : STATUS_TEXT[my.status]}</p>
           {my.message && my.status === 'pending' && (
             <p className="text-sm text-ink-muted">Ваше сообщение: «{my.message}»</p>
           )}

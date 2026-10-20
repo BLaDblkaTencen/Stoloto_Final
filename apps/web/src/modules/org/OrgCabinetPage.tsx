@@ -323,7 +323,7 @@ function ReviewsPanel({ orgId, reviews }: { orgId: string; reviews?: Organizatio
         ))}
       </ul>
       {latest.length > 0 && <ReviewItems items={latest} empty="" />}
-      <Link to={`/organizations/${orgId}`} className="self-start font-semibold">
+      <Link to={`/organizations/${orgId}`} className="tap-area self-start font-semibold">
         Все отзывы на странице клуба →
       </Link>
     </Card>
@@ -352,7 +352,7 @@ function Profile({ org, onEdit }: { org: OrganizationOwner; onEdit: () => void }
         {org.sports.map((sport) => (
           <SportTag key={sport.id} sport={sport} />
         ))}
-        <Link to={`/organizations/${org.id}`} className="font-semibold">
+        <Link to={`/organizations/${org.id}`} className="tap-area font-semibold">
           Публичная страница →
         </Link>
       </div>

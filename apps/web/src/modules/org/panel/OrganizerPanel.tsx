@@ -23,6 +23,7 @@ import {
   SkeletonList,
 } from '../../../shared/ui';
 import { plural } from '../../user/format';
+import { isWithdrawn, WITHDRAWN_LABEL } from '../../user/JoinPanel';
 import { Reliability } from '../../user/reviews/ReviewList';
 import { useDecideRegistration, useEventRegistrations, useSetRegistrationClosed } from './api';
 
@@ -137,13 +138,15 @@ export function OrganizerPanel({ event }: { event: EventDetails }) {
                 <Avatar name={item.user.name} size={40} />
                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                   <p className="flex flex-wrap items-center gap-2">
-                    <Link to={`/users/${item.user.id}`} className="font-semibold">
+                    <Link to={`/users/${item.user.id}`} className="tap-area font-semibold">
                       {item.user.name}
                     </Link>
                     {item.status === 'pending' && event.isPast ? (
                       <Badge tone="neutral" icon="clock">
                         Не рассмотрена
                       </Badge>
+                    ) : isWithdrawn(event.joinMode, item) ? (
+                      <Badge tone="neutral">{WITHDRAWN_LABEL}</Badge>
                     ) : (
                       <Badge tone={STATUS_BADGE[item.status].tone}>
                         {STATUS_BADGE[item.status].label}

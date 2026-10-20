@@ -58,7 +58,7 @@ export function EventPage() {
 function EventView({ event }: { event: EventDetails }) {
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/" className="self-start font-semibold">
+      <Link to="/" className="tap-area self-start font-semibold">
         ← Все встречи
       </Link>
 
@@ -177,9 +177,12 @@ function Participants({ event }: { event: EventDetails }) {
       ) : (
         <ul className="flex flex-col gap-2">
           {event.participants.map((person) => (
-            <li key={person.id} className="flex items-center gap-3">
-              <Avatar name={person.name} size={36} />
-              <Link to={`/users/${person.id}`}>{person.name}</Link>
+            <li key={person.id}>
+              {/* Ссылка — вся строка с аватаром: нажать проще, чем на одно имя. */}
+              <Link to={`/users/${person.id}`} className="flex min-h-11 items-center gap-3">
+                <Avatar name={person.name} size={36} />
+                {person.name}
+              </Link>
             </li>
           ))}
         </ul>

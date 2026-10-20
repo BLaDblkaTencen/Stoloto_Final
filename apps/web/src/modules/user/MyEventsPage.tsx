@@ -21,7 +21,7 @@ import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { useMyEvents, useMyRegistrations, type Scope } from './api';
 import { MetaLine, SportTile } from './EventBits';
-import { MISSED_LABEL, MISSED_TEXT } from './JoinPanel';
+import { isWithdrawn, MISSED_LABEL, MISSED_TEXT, WITHDRAWN_LABEL } from './JoinPanel';
 import { formatSeats, formatWhen, LOCAL_TIME_NOTE, plural } from './format';
 import { AttendanceModal } from './reviews/AttendanceModal';
 import { ReviewModal } from './reviews/ReviewModal';
@@ -126,7 +126,12 @@ function Joined({ scope }: { scope: Scope }) {
       {list.data.items.map((item) => {
         // Заявка, на которую не ответили до начала: «ждёт решения» у прошедшей встречи — неправда.
         const missed = scope === 'past' && item.myRegistration.status === 'pending';
-        const hint = missed ? MISSED_TEXT : REGISTRATION_HINT[item.myRegistration.status];
+        const withdrawn = isWithdrawn(item.joinMode, item.myRegistration);
+        const hint = missed
+          ? MISSED_TEXT
+          : withdrawn
+            ? 'Вы отозвали заявку'
+            : REGISTRATION_HINT[item.myRegistration.status];
         return (
           <EventRow key={item.id} event={item}>
             {item.status !== 'published' ? (
@@ -135,6 +140,8 @@ function Joined({ scope }: { scope: Scope }) {
               <Badge tone="neutral" icon="clock">
                 {MISSED_LABEL}
               </Badge>
+            ) : withdrawn ? (
+              <Badge tone="neutral">{WITHDRAWN_LABEL}</Badge>
             ) : (
               <StatusBadge kind="registration" status={item.myRegistration.status} />
             )}
@@ -255,7 +262,10 @@ function EventRow({ event, children }: { event: EventListItem; children: ReactNo
     <li className="flex gap-4 rounded-lg border-2 border-ink bg-surface p-4 shadow-sm">
       <SportTile sport={event.sport} size={44} />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <Link to={`/events/${event.id}`} className="text-[19px] font-semibold leading-snug">
+        <Link
+          to={`/events/${event.id}`}
+          className="tap-area text-[19px] font-semibold leading-snug"
+        >
           {event.title}
         </Link>
         <MetaLine icon="calendar">{formatWhen(event.startsAt, event.endsAt)}</MetaLine>

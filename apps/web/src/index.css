@@ -61,6 +61,17 @@
   padding-inline: 24px;
 }
 
+/*
+ * Ссылка-текст без рамки кнопки («← Все встречи», имя, название встречи): зона нажатия ≥44px,
+ * как у кнопок, даже при тексте 16px, а строка остаётся прежней высоты — отступ внутрь и такой же
+ * отрицательный наружу.
+ */
+@utility tap-area {
+  display: inline-block;
+  padding-block: 11px;
+  margin-block: -11px;
+}
+
 @layer base {
   body {
     background: var(--color-bg);
