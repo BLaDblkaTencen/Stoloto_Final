@@ -24,6 +24,7 @@ import {
 import { formErrors } from '../../org/errors';
 import { useAttendance, useSaveAttendance } from '../api';
 import { StarsInput } from './Stars';
+import { REVIEW_TAG_ICONS } from './tags';
 
 type Mark = Pick<AttendanceItem, 'attended' | 'rating' | 'tags' | 'comment'> & {
   showComment: boolean;
@@ -163,6 +164,7 @@ function AttendanceForm({
                       <Chip
                         key={tag}
                         index={index}
+                        icon={REVIEW_TAG_ICONS[tag]}
                         pressed={mark.tags.includes(tag)}
                         color="var(--status-success)"
                         onClick={() => update(user.id, { tags: toggle(mark.tags, tag) })}

@@ -35,12 +35,16 @@ export function StarsInput({
   onChange,
   label,
   size = 36,
+  className = '',
 }: {
   value: number;
   onChange: (value: number) => void;
   label: string;
   size?: number;
+  className?: string;
 }) {
+  // Кнопка не меньше 48px (DESIGN_BRIEF), а у крупных звёзд — с запасом под наклон при наведении.
+  const button = Math.max(48, size + 12);
   const [hover, setHover] = useState(0);
   const refs = useRef<(HTMLButtonElement | null)[]>([]);
   const shown = hover || value;
@@ -58,7 +62,7 @@ export function StarsInput({
     <div
       role="radiogroup"
       aria-label={label}
-      className="flex flex-wrap"
+      className={`flex flex-wrap ${className}`}
       onMouseLeave={() => setHover(0)}
     >
       {VALUES.map((n) => (
@@ -75,7 +79,8 @@ export function StarsInput({
           onClick={() => onChange(n)}
           onMouseEnter={() => setHover(n)}
           onKeyDown={(event) => onKeyDown(event, n)}
-          className="inline-flex size-12 cursor-pointer items-center justify-center rounded-md transition-[translate] duration-100 hover:-translate-y-0.5"
+          style={{ width: button, height: button }}
+          className="inline-flex cursor-pointer items-center justify-center rounded-md transition-[translate,rotate] duration-100 hover:-translate-y-0.5 hover:-rotate-6"
         >
           <Star filled={n <= shown} size={size} />
         </button>
