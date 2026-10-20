@@ -24,6 +24,12 @@ export const ICON_PATHS = {
   close: 'M6 6l12 12M18 6L6 18',
   chevronDown: 'M6 9l6 6l6 -6',
   arrowRight: 'M5 12h14M13 6l6 6l-6 6',
+  // вкладки меню на телефоне (app/MainNav): контуры Tabler Icons, MIT
+  ticket:
+    'M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 0 1 2 2v3a2 2 0 0 0 0 4v3a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-3a2 2 0 0 0 0 -4v-3a2 2 0 0 1 2 -2',
+  user: 'M12 3a4 4 0 1 0 0 8a4 4 0 1 0 0 -8M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2',
+  shield: 'M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3',
+  flag: 'M5 5a5 5 0 0 1 7 0a5 5 0 0 0 7 0v9a5 5 0 0 1 -7 0a5 5 0 0 0 -7 0zM5 21v-7',
   // теги отзывов (modules/user/reviews): контуры Tabler Icons, MIT
   sprout:
     'M12 10a6 6 0 0 0 -6 -6h-3v2a6 6 0 0 0 6 6h3M12 14a6 6 0 0 1 6 -6h3v1a6 6 0 0 1 -6 6h-3M12 20v-10',
