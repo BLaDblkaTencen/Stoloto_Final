@@ -28,6 +28,7 @@ import {
   EmptyState,
   ErrorState,
   Chip,
+  Icon,
   Skeleton,
   SkeletonList,
   TextareaField,
@@ -457,19 +458,34 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
 
       {/* На широком экране полоса прилипает к низу: кнопка видна, где бы человек ни был. На телефоне
           она закрыла бы четверть экрана, поэтому стоит в конце формы. Полоса белая с жёлтой линией
-          сверху: заметна над любой частью формы, но не спорит с ней, как тёмная. */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border-2 border-t-8 border-ink border-t-accent bg-surface lg:sticky lg:bottom-4 lg:z-[1100] px-5 py-4 text-ink shadow-md">
-        <p className="min-w-0 flex-[1_1_280px]">
-          {event
-            ? 'Участники увидят изменения сразу после сохранения.'
-            : 'Встреча появится в ленте и на карте сразу после публикации.'}
-        </p>
-        <div className="flex flex-wrap gap-3">
-          <ButtonLink to={event ? `/events/${event.id}` : '/'} variant="secondary" size="lg">
+          сверху, с заголовком и крупной кнопкой-таблеткой: главное действие формы видно сразу. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-7 gap-y-4 rounded-xl border-2 border-t-[10px] border-ink border-t-accent bg-surface px-5 py-[22px] sm:pr-[26px] sm:pl-8 text-ink shadow-lg lg:sticky lg:bottom-4 lg:z-[1100]">
+        <div className="flex min-w-0 flex-[1_1_320px] flex-col gap-1.5">
+          <p className="font-display text-[26px] leading-tight font-bold">
+            {event ? 'Готово? Сохраняем' : 'Готово? Публикуем'}
+          </p>
+          <p className="text-[18px] text-ink-muted">
+            {event
+              ? 'Участники увидят изменения сразу после сохранения.'
+              : 'Встреча появится в ленте и на карте сразу после публикации.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3.5 max-sm:w-full max-sm:flex-col-reverse max-sm:items-stretch">
+          <Link
+            to={event ? `/events/${event.id}` : '/'}
+            className="inline-flex min-h-12 items-center justify-center px-1.5 font-semibold underline underline-offset-[5px]"
+          >
             Отмена
-          </ButtonLink>
-          <Button type="submit" variant="accent" size="lg" loading={saving}>
+          </Link>
+          <Button
+            type="submit"
+            variant="accent"
+            size="xl"
+            loading={saving}
+            className="max-sm:w-full"
+          >
             {saving ? 'Сохраняем…' : event ? 'Сохранить изменения' : 'Опубликовать встречу'}
+            <Icon name="arrowRight" size={22} />
           </Button>
         </div>
       </div>
