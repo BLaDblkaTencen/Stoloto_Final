@@ -168,7 +168,14 @@ function Organized({ scope }: { scope: Scope }) {
     <ul className="grid gap-4 lg:grid-cols-2">
       {list.data.items.map((item) => (
         <EventRow key={item.id} event={item}>
-          <StatusBadge kind="event" status={item.status} />
+          {/* У прошедшей «Опубликовано» ничего не говорит. Снятое оставляем как есть: это причина. */}
+          {scope === 'past' && item.status === 'published' ? (
+            <Badge tone="neutral" icon="clock">
+              Прошло
+            </Badge>
+          ) : (
+            <StatusBadge kind="event" status={item.status} />
+          )}
           {scope === 'upcoming' && item.registrationClosed && (
             <Badge tone="neutral" icon="lock">
               Запись закрыта
