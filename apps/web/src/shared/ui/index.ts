@@ -14,7 +14,7 @@ export { Listbox, type ListboxOption } from './Listbox';
 export { Modal } from './Modal';
 export { RadioCards } from './RadioCards';
 export { SelectField } from './SelectField';
-export { sportColor, sportColorIndex, sportIcon } from './sport';
+export { sportColor, sportColorIndex, sportIcon, sportThemeIcon } from './sport';
 export { EmptyState, ErrorState, Skeleton, SkeletonList } from './States';
 export { TextareaField } from './TextareaField';
 export { TextField } from './TextField';

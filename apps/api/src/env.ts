@@ -13,6 +13,8 @@ const schema = z.object({
   DATABASE_URL: z.string().startsWith('postgres', 'DATABASE_URL должен начинаться с postgres://'),
   SESSION_TTL_DAYS: z.coerce.number().int().positive().default(7),
   SEED_ON_START: z.stringbool().default(false),
+  // Поиск адреса для «Места встречи» (OpenStreetMap Nominatim); пустая строка выключает поиск.
+  GEOCODER_URL: z.union([z.url(), z.literal('')]).default('https://nominatim.openstreetmap.org'),
 });
 
 // Вне продакшна без .env берём локальную базу из .env.example: так тесты, которым база

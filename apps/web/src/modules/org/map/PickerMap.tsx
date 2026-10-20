@@ -60,7 +60,13 @@ function PointPicker({ onPick }: { onPick: (lat: number, lng: number) => void })
   return null;
 }
 
-/** Выбор из списка под картой сдвигает карту к месту, чтобы его было видно. */
+/** Улица и дом различимы с этого масштаба: точка по адресу видна на своём месте. */
+const FOUND_ZOOM = 16;
+
+/**
+ * Выбор из списка под картой сдвигает карту к месту, чтобы его было видно. Точку, найденную
+ * по адресу, карта ещё и приближает: человек проверяет, туда ли она встала.
+ */
 function FollowSelection({ value }: { value: PlaceValue }) {
   const map = useMap();
   const target =
@@ -71,10 +77,12 @@ function FollowSelection({ value }: { value: PlaceValue }) {
         : null;
   const lat = target?.[0];
   const lng = target?.[1];
+  const found = value?.kind === 'point' ? value.found : undefined;
   useEffect(() => {
     if (lat === undefined || lng === undefined) return;
-    if (!map.getBounds().pad(-0.1).contains([lat, lng])) map.panTo([lat, lng]);
-  }, [map, lat, lng]);
+    if (found) map.flyTo([lat, lng], Math.max(map.getZoom(), FOUND_ZOOM), { duration: 0.6 });
+    else if (!map.getBounds().pad(-0.1).contains([lat, lng])) map.panTo([lat, lng]);
+  }, [map, lat, lng, found]);
   return null;
 }
 

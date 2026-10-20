@@ -1,5 +1,6 @@
 // Киллер-фича «Место встречи» для других зон. Leaflet здесь не импортируется: он грузится лениво
 // внутри MapPicker, EventsMap и PlaceMap, поэтому импорт отсюда не утяжеляет страницу.
+export { AddressField, type AddressFieldProps } from './AddressField';
 export { useVenue } from './api';
 export { EventsMap, type EventsMapProps } from './EventsMap';
 export type { MapFocus } from './EventsMapView';

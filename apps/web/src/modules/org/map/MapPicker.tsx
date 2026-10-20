@@ -3,11 +3,12 @@
 //   const [place, setPlace] = useState<PlaceValue>(null);
 //   <MapPicker sportId={form.sportId} value={place} onChange={setPlace} />
 //   // place.kind === 'venue' → venueId = place.venue.id, адрес можно подставить из place.venue.address
-//   // place.kind === 'point' → lat, lng; адрес человек пишет сам
+//   // place.kind === 'point' → lat, lng; адрес человек пишет сам или его подставит AddressField
 //
 // Карта грузится лениво. Список площадок под картой работает и без неё: для клавиатуры,
 // экранного диктора и на случай, если карта не загрузилась.
 import { VENUE_TYPE_LABELS } from '@sport/shared';
+import type { GeocodePlace } from '@sport/shared/schemas/geocoding';
 import type { Venue, VenueCard as VenueInfo } from '@sport/shared/schemas/venues';
 import { lazy } from 'react';
 import { Alert, Button, SelectField, VenueCard } from '../../../shared/ui';
@@ -16,7 +17,10 @@ import { MapBoundary } from './MapBoundary';
 import { venueCardData } from './venueCardData';
 
 export type PlaceValue =
-  { kind: 'venue'; venue: VenueInfo } | { kind: 'point'; lat: number; lng: number } | null;
+  | { kind: 'venue'; venue: VenueInfo }
+  /** found — точку поставил поиск адреса (AddressField): карта приближается к ней. */
+  | { kind: 'point'; lat: number; lng: number; found?: GeocodePlace }
+  | null;
 
 export type MapPickerProps = {
   /** Вид спорта события: подходящие ему площадки подсвечиваются. */
@@ -44,7 +48,7 @@ export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
           ? 'Жёлтые метки — площадки, подходящие для этого вида спорта, серые — остальные. '
           : 'Метки — площадки, где можно договориться о встрече. '}
         Нажмите на метку, чтобы выбрать площадку, или на свободное место карты, чтобы поставить свою
-        точку (двор, парк).
+        точку (двор, парк). Адрес, найденный выше, тоже появится здесь точкой.
       </p>
 
       <MapBoundary className={MAP_HEIGHT}>
@@ -90,9 +94,14 @@ export function MapPicker({ sportId, value, onChange, error }: MapPickerProps) {
       )}
       {value?.kind === 'point' && (
         <div className="flex flex-col gap-3 rounded-lg border-2 border-ink bg-surface p-5">
-          <p className="font-semibold">Своя точка на карте</p>
+          <p className="font-semibold">
+            {value.found ? `Точка по адресу: ${value.found.label}` : 'Своя точка на карте'}
+          </p>
           <p className="text-ink-muted">
-            Опишите место в поле «Адрес», чтобы участники точно нашли вас: например «у главного
+            {value.found
+              ? 'Если точка стоит не там, нажмите на карту, где вы встречаетесь: она переместится. '
+              : ''}
+            Уточните место в поле «Как найти», чтобы участники точно нашли вас: например «у главного
             входа в парк, возле фонтана».
           </p>
           <Button variant="secondary" className="self-start" onClick={() => onChange(null)}>

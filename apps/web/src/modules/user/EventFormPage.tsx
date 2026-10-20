@@ -17,6 +17,7 @@ import {
   type EventInput,
 } from '@sport/shared/schemas/events';
 import { normalizeSportName, sportSlug } from '@sport/shared/schemas/sports';
+import { SPORT_THEME_LABELS, sportTheme } from '@sport/shared/sportThemes';
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { ApiError } from '../../shared/api/client';
@@ -37,8 +38,9 @@ import {
 import { RequireAuth } from '../auth/RequireAuth';
 import { useMe } from '../auth/api';
 import { useMyOrganization } from '../org/api';
-import { MapPicker, useVenue, type PlaceValue } from '../org/map';
+import { AddressField, MapPicker, useVenue, type PlaceValue } from '../org/map';
 import { useCreateEvent, useEvent, useSports, useUpdateEvent } from './api';
+import { SportTile } from './EventBits';
 import { DayPicker, JoinModeCards, SeatsField, SportTiles, TimePicker } from './EventFormParts';
 import { localParts, LOCAL_TIME_NOTE, toUtcIso } from './format';
 
@@ -276,6 +278,8 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
   // Подсказка к «своему» виду спорта: такой уже есть в каталоге — выберем его, дубля не будет.
   const customSlug = form.sportId === CUSTOM_SPORT ? sportSlug(form.sportName) : '';
   const existing = customSlug ? sports.data?.find((sport) => sport.slug === customSlug) : undefined;
+  // Новый вид спорта получает иконку по теме названия (участник 2): показываем её сразу.
+  const customTheme = customSlug && !existing ? sportTheme(customSlug) : null;
 
   return (
     <form ref={formRef} onSubmit={submit} noValidate className="flex flex-col gap-6">
@@ -323,20 +327,30 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
               />
             )}
             {form.sportId === CUSTOM_SPORT && (
-              <TextField
-                label="Свой вид спорта"
-                placeholder="Например: Скандинавская ходьба"
-                hint={
-                  existing
-                    ? `«${existing.name}» уже есть в списке — встреча попадёт туда`
-                    : form.sportName.trim()
-                      ? `Добавим в каталог как «${normalizeSportName(form.sportName)}»`
-                      : 'Новый вид спорта сразу появится в поиске и фильтрах'
-                }
-                value={form.sportName}
-                onChange={(e) => set('sportName')(e.target.value)}
-                error={errors.sportId}
-              />
+              <div className="flex flex-col gap-3">
+                <TextField
+                  label="Свой вид спорта"
+                  placeholder="Например: Скандинавская ходьба"
+                  hint={
+                    existing
+                      ? `«${existing.name}» уже есть в списке — встреча попадёт туда`
+                      : form.sportName.trim()
+                        ? `Добавим в каталог как «${normalizeSportName(form.sportName)}»`
+                        : 'Новый вид спорта сразу появится в поиске и фильтрах'
+                  }
+                  value={form.sportName}
+                  onChange={(e) => set('sportName')(e.target.value)}
+                  error={errors.sportId}
+                />
+                {customSlug && !existing && (
+                  <p aria-live="polite" className="flex items-center gap-3 text-sm text-ink-muted">
+                    <SportTile sport={{ slug: customSlug }} size={44} />
+                    {customTheme
+                      ? `Значок подобрали по названию: ${SPORT_THEME_LABELS[customTheme]}`
+                      : 'Тему по названию не узнали — будет общий значок'}
+                  </p>
+                )}
+              </div>
             )}
             <TextField
               label="Название"
@@ -394,24 +408,25 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
         </div>
         <div className="flex min-w-0 flex-col gap-6 max-lg:contents">
           <Section title="Где?" className="max-lg:order-3">
+            {/* Адрес над картой: вписали — точка появляется на карте ниже (участник 2). */}
+            <AddressField
+              hint={
+                form.place?.kind === 'venue'
+                  ? 'Подставлен адрес площадки, можно уточнить'
+                  : 'Улица и дом или название места — покажем его на карте'
+              }
+              maxLength={EVENT_LIMITS.address.max}
+              value={form.address}
+              onChange={set('address')}
+              place={form.place}
+              onPlace={choosePlace}
+              error={errors.address}
+            />
             <MapPicker
               sportId={form.sportId && form.sportId !== CUSTOM_SPORT ? form.sportId : undefined}
               value={form.place}
               onChange={choosePlace}
               error={errors.venueId ?? errors.lat}
-            />
-            <TextField
-              label="Адрес или место"
-              hint={
-                form.place?.kind === 'venue'
-                  ? 'Подставлен адрес площадки, можно уточнить'
-                  : 'Так, чтобы человек нашёл без карты: улица и дом или понятное описание'
-              }
-              placeholder="Остров Татышев, главный вход"
-              maxLength={EVENT_LIMITS.address.max}
-              value={form.address}
-              onChange={(e) => set('address')(e.target.value)}
-              error={errors.address}
             />
             <TextField
               label="Как найти"
