@@ -2,13 +2,15 @@
 // базы: «Мои мероприятия» показывают по ним кнопки, а сервис по ним же отказывает.
 import type { EventStatus, RegistrationStatus, UserRole } from '@sport/shared';
 import {
+  DEFAULT_EVENT_HOURS,
   RATING_MIN_REVIEWS,
   REVIEW_WINDOW_DAYS,
   type RatingSummary,
 } from '@sport/shared/schemas/reviews';
 import type { Denial } from '../events/rules';
 
-const DAY = 24 * 60 * 60 * 1000;
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
 
 export type ReviewEvent = {
   status: EventStatus;
@@ -17,9 +19,9 @@ export type ReviewEvent = {
   createdBy: string;
 };
 
-/** Встреча закончилась в ends_at, а если его нет — считаем, что в момент начала. */
+/** Встреча закончилась в ends_at, а если его нет — через DEFAULT_EVENT_HOURS после начала. */
 export const eventEnd = (event: Pick<ReviewEvent, 'startsAt' | 'endsAt'>) =>
-  event.endsAt ?? event.startsAt;
+  event.endsAt ?? new Date(event.startsAt.getTime() + DEFAULT_EVENT_HOURS * HOUR);
 
 export const reviewClosesAt = (event: Pick<ReviewEvent, 'startsAt' | 'endsAt'>) =>
   new Date(eventEnd(event).getTime() + REVIEW_WINDOW_DAYS * DAY);

@@ -8,6 +8,11 @@ export type ReviewDirection = (typeof REVIEW_DIRECTIONS)[number];
 
 /** Сколько дней после окончания встречи можно оставить и поправить отзыв. */
 export const REVIEW_WINDOW_DAYS = 14;
+/**
+ * Встреча без времени окончания считается закончившейся через столько часов после начала:
+ * иначе отзыв открывался бы в момент старта, когда люди только собрались.
+ */
+export const DEFAULT_EVENT_HOURS = 2;
 /** Средняя оценка видна от стольких отзывов: одна оценка не должна решать за человека. */
 export const RATING_MIN_REVIEWS = 3;
 export const REVIEW_COMMENT_MAX = 500;

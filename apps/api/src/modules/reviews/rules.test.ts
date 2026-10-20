@@ -22,8 +22,13 @@ const at = (ms: number) => new Date(start.getTime() + ms);
 const user = { id: 'user', role: 'user' as const };
 
 describe('окно отзывов', () => {
-  it('без времени окончания встреча кончается в момент начала', () => {
-    expect(eventEnd({ startsAt: start, endsAt: null })).toEqual(start);
+  it('без времени окончания встреча кончается через 2 часа после начала', () => {
+    expect(eventEnd({ startsAt: start, endsAt: null })).toEqual(at(2 * HOUR));
+    const noEnd = { ...event, endsAt: null };
+    expect(isReviewOpen(noEnd, start)).toBe(false);
+    expect(isReviewOpen(noEnd, at(2 * HOUR - 1))).toBe(false);
+    expect(isReviewOpen(noEnd, at(2 * HOUR))).toBe(true);
+    expect(isReviewOpen(noEnd, at(2 * HOUR + 14 * DAY + 1))).toBe(false);
   });
 
   it('открыто с окончания встречи и 14 дней после', () => {
