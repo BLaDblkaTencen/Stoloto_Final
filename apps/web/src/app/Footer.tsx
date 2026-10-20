@@ -40,8 +40,9 @@ export function Footer() {
             {guest && (
               <>
                 <FooterLink to={REGISTER_ORGANIZATION}>Зарегистрировать организацию</FooterLink>
-                <p className="text-sm text-ink-muted">
-                  Страница клуба появится после проверки администратором
+                {/* Подпись к ссылке: прижата к ней и в одну строку, мельче 16px текст нельзя. */}
+                <p className="-mt-1 text-sm text-ink-muted md:-mt-2">
+                  Страница клуба — после проверки
                 </p>
               </>
             )}
