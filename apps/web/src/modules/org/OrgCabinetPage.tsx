@@ -193,7 +193,7 @@ function Profile({ org, onEdit }: { org: OrganizationOwner; onEdit: () => void }
   );
 }
 
-const STEPS = ['Заявка подана', 'Проверка администратором', 'Организация допущена'];
+const STEPS = ['Подача заявки', 'Проверка администратором', 'Организация допущена'];
 
 /** Где сейчас заявка: понятная полоса из трёх шагов. */
 function Steps({ status }: { status: OrgStatus | null }) {
