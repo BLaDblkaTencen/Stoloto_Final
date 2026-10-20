@@ -22,7 +22,11 @@ export function RegisterPage() {
   const navigate = useNavigate();
   const me = useMe();
   const register = useRegister();
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: '' });
+  // ?role=organization — из подвала «Зарегистрировать организацию»: тип аккаунта уже выбран.
+  const presetRole = ACCOUNT_TYPES.some((type) => type.value === params.get('role'))
+    ? (params.get('role') as RegisterBody['role'])
+    : '';
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: presetRole });
   const [fields, setFields] = useState<Record<string, string>>({});
 
   if (me.data) return <Navigate to={next} replace />;
