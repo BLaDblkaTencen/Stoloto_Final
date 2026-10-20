@@ -53,7 +53,10 @@
   --map-road: #ffffff;
 
   /* Шрифты: оба с полной кириллицей, Google Fonts, OFL */
-  --font-display: 'Comfortaa', 'Rubik', system-ui, sans-serif;
+  /* Заголовки — широкий спортивный Unbounded (как номера на форме и табло), логотип остаётся
+     на Comfortaa: это знак «движа», его не меняем вместе с заголовками. */
+  --font-display: 'Unbounded', 'Rubik', system-ui, sans-serif;
+  --font-logo: 'Comfortaa', 'Rubik', system-ui, sans-serif;
   --font-body: 'Rubik', system-ui, sans-serif;
 
   /* Размеры текста: минимум 16px для любого текста в интерфейсе */

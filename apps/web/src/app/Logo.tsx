@@ -7,7 +7,7 @@ export function Logo() {
     // Логотип не перекрашивается при наведении, как обычные ссылки (a:hover в index.css).
     <Link to="/" className="flex items-center gap-2 no-underline hover:text-ink hover:no-underline">
       <LogoMark />
-      <span className="font-display text-[28px] leading-none font-bold">движ</span>
+      <span className="font-logo text-[28px] leading-none font-bold">движ</span>
     </Link>
   );
 }

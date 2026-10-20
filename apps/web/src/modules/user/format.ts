@@ -83,6 +83,19 @@ export function isoDay(days = 0, from = new Date()) {
   return isoDayFormat.format(new Date(from.getTime() + days * 86_400_000));
 }
 
+/** «08:00» — время начала по Красноярску. */
+export const formatTime = (iso: string) => timeFormat.format(new Date(iso));
+
+/** День встречи по Красноярску: «2026-10-26» — ключ для группировки ленты по дням. */
+export const eventDay = (iso: string) => isoDayFormat.format(new Date(iso));
+
+/** «Сегодня», «Завтра» или «Сб, 24 окт.» — заголовок дня в ленте. */
+export function formatDayHeading(day: string, from = new Date()) {
+  if (day === isoDay(0, from)) return 'Сегодня';
+  if (day === isoDay(1, from)) return 'Завтра';
+  return formatDayLabel(day);
+}
+
 /** «3 места», «1 место», «12 мест». */
 export function plural(n: number, [one, few, many]: readonly [string, string, string]) {
   const mod10 = n % 10;

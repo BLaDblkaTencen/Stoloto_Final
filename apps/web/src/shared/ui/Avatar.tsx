@@ -21,10 +21,11 @@ export function Avatar({ name, size = 44 }: { name: string; size?: number }) {
         width: size,
         height: size,
         background: sportColor(name.trim().toLowerCase()),
-        // Инициалы растут вместе с аватаром, но не мельче 16px (DESIGN_BRIEF).
+        // Инициалы растут вместе с аватаром, но не мельче 16px (DESIGN_BRIEF). Шрифт — Rubik:
+        // широкий Unbounded заголовков не помещает две буквы в маленький круг.
         fontSize: Math.max(16, Math.round(size * 0.36)),
       }}
-      className="inline-flex shrink-0 items-center justify-center rounded-full border-2 border-ink font-display leading-none font-bold shadow-sm"
+      className="inline-flex shrink-0 items-center justify-center rounded-full border-2 border-ink font-sans leading-none font-bold shadow-sm"
     >
       {initials(name)}
     </span>

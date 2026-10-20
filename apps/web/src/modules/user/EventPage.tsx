@@ -23,6 +23,7 @@ import { useEvent } from './api';
 import { MetaLine, OrganizerLink, SportTile } from './EventBits';
 import { formatSeats, formatWhen, LOCAL_TIME_NOTE } from './format';
 import { OrganizerRating } from './reviews/ReviewList';
+import { Plate, SportSurface, surfaceFor } from './surface/SportSurface';
 import { Discussion } from './Discussion';
 import { JoinPanel } from './JoinPanel';
 
@@ -76,13 +77,21 @@ function EventView({ event }: { event: EventDetails }) {
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
         <Card className="flex flex-col gap-6">
           <header className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <SportTile sport={event.sport} size={44} />
-              <span className="font-semibold">{event.sport.name}</span>
-              <JoinModeBadge mode={event.joinMode} />
-              <Badge icon={null}>{EVENT_LEVEL_LABELS[event.level]}</Badge>
-            </div>
-            <h1 className="text-h2 leading-tight">{event.title}</h1>
+            {/* Шапка — покрытие вида спорта встречи: поле, паркет, бассейн, дорожка… */}
+            <SportSurface
+              kind={surfaceFor(event.sport.slug)}
+              className="-mx-6 -mt-6 mb-1 flex min-h-40 flex-col justify-between gap-6 rounded-t-[22px] border-b-2 border-ink p-5"
+            >
+              <div className="flex flex-wrap items-center gap-2.5">
+                <SportTile sport={event.sport} size={44} />
+                <Plate className="font-semibold">{event.sport.name}</Plate>
+                <JoinModeBadge mode={event.joinMode} />
+                <Badge icon={null}>{EVENT_LEVEL_LABELS[event.level]}</Badge>
+              </div>
+              <h1 className="text-h2 leading-[1.35]">
+                <Plate>{event.title}</Plate>
+              </h1>
+            </SportSurface>
             <p className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span>
                 Организатор: <OrganizerLink organizer={event.organizer} />

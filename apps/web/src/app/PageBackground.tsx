@@ -7,10 +7,11 @@ import { useLocation } from 'react-router';
 
 export type BackgroundVariant = 'circles' | 'hills' | 'diagonals' | 'lines';
 
-/** Главная — пятна и кольца; создание встречи и кабинет клуба — «движение» по диагонали;
- *  встреча, клубы и карта — облака и холмы «на улице»; профиль, вход и админка — линии. */
-export function backgroundFor(pathname: string): BackgroundVariant {
-  if (pathname === '/') return 'circles';
+/** Главная — без фона: там площадка вида спорта (HomeHero); создание встречи и кабинет клуба —
+ *  «движение» по диагонали; встреча, клубы и карта — облака и холмы «на улице»; профиль, вход
+ *  и админка — линии. Вариант «пятна и кольца» пока не используется. */
+export function backgroundFor(pathname: string): BackgroundVariant | null {
+  if (pathname === '/') return null;
   if (pathname === '/events/new' || pathname.endsWith('/edit')) return 'diagonals';
   if (pathname === '/org' || pathname.startsWith('/org/')) return 'diagonals';
   if (
@@ -26,6 +27,7 @@ export function backgroundFor(pathname: string): BackgroundVariant {
 export function PageBackground() {
   const { pathname } = useLocation();
   const variant = backgroundFor(pathname);
+  if (!variant) return null;
   return (
     <div
       aria-hidden="true"
