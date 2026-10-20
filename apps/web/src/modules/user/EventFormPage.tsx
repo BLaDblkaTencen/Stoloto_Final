@@ -456,8 +456,9 @@ function EventForm({ initial, event }: { initial: FormState; event?: EventDetail
       </div>
 
       {/* На широком экране полоса прилипает к низу: кнопка видна, где бы человек ни был. На телефоне
-          она закрыла бы четверть экрана, поэтому стоит в конце формы. */}
-      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border-2 border-ink bg-ink lg:sticky lg:bottom-4 lg:z-[1100] px-5 py-4 text-white shadow-[4px_4px_0_var(--color-accent)]">
+          она закрыла бы четверть экрана, поэтому стоит в конце формы. Полоса белая с жёлтой линией
+          сверху: заметна над любой частью формы, но не спорит с ней, как тёмная. */}
+      <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border-2 border-t-8 border-ink border-t-accent bg-surface lg:sticky lg:bottom-4 lg:z-[1100] px-5 py-4 text-ink shadow-md">
         <p className="min-w-0 flex-[1_1_280px]">
           {event
             ? 'Участники увидят изменения сразу после сохранения.'
