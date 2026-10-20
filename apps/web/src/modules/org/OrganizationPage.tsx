@@ -14,17 +14,10 @@ import {
   SkeletonList,
   StatusBadge,
 } from '../../shared/ui';
+import { formatWhen } from '../user/format';
 import { OrganizationReviewsSection } from '../user/reviews/ReviewList';
 import { useOrganization, useOrganizationEvents } from './api';
 import { SportTag } from './SportTag';
-
-const dateFormat = new Intl.DateTimeFormat('ru', {
-  weekday: 'short',
-  day: 'numeric',
-  month: 'long',
-  hour: '2-digit',
-  minute: '2-digit',
-});
 
 export function OrganizationPage() {
   const { id = '' } = useParams();
@@ -119,7 +112,7 @@ function EventRow({ event }: { event: EventListItem }) {
       </h3>
       <p className="flex items-center gap-2">
         <Icon name="calendar" size={18} />
-        {dateFormat.format(new Date(event.startsAt))}
+        {formatWhen(event.startsAt, event.endsAt)}
       </p>
       <p className="flex items-center gap-2">
         <Icon name="pin" size={18} />

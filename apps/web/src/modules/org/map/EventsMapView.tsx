@@ -7,7 +7,7 @@
 // Нажатие на группу приближает карту к ней, а всё, что в одном месте, показывает списком.
 // Наведение — название и время встречи. Метка с открытым попапом и выбранная встреча в группы
 // не уходят.
-import { EVENT_TIMEZONE, type EventMapItem } from '@sport/shared/schemas/events';
+import type { EventMapItem } from '@sport/shared/schemas/events';
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { Bbox, Venue } from '@sport/shared/schemas/venues';
 import type L from 'leaflet';
@@ -56,9 +56,8 @@ export type EventsMapViewProps = {
 /** key меняется при каждом нажатии «На карте», чтобы повторное нажатие снова открыло попап. */
 export type MapFocus = { id: string; lat: number; lng: number; key: number };
 
-// Время встречи по Красноярску, как в ленте и карточке, а не в поясе браузера.
+// Время встречи в поясе устройства, как в ленте и карточке.
 const dateFormat = new Intl.DateTimeFormat('ru', {
-  timeZone: EVENT_TIMEZONE,
   weekday: 'short',
   day: 'numeric',
   month: 'long',
