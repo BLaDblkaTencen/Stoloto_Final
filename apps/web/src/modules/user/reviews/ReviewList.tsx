@@ -149,7 +149,8 @@ function ReviewItem({ review }: { review: Review }) {
   );
 }
 
-function ReviewItems({ items, empty }: { items: Review[]; empty: string }) {
+/** Список отзывов: на странице клуба, в профиле и в кабинете организации. */
+export function ReviewItems({ items, empty }: { items: Review[]; empty: string }) {
   if (items.length === 0) return <p className="text-ink-muted">{empty}</p>;
   return (
     <ul className="flex flex-col">
