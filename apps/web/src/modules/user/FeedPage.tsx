@@ -31,7 +31,7 @@ import {
 import { useMe } from '../auth/api';
 import { EventsMap, type MapFocus } from '../org/map';
 import { useFeed, useJoinEvent, useMyRegistrations, useSports, type FeedParams } from './api';
-import { OrganizerLink, SportTile } from './EventBits';
+import { MetaLine, SportTile } from './EventBits';
 import { formatSeats, formatShort, formatWhen, isoDay, LOCAL_TIME_NOTE, plural } from './format';
 
 const WHEN_OPTIONS = [
@@ -583,7 +583,7 @@ function EventList({
   );
 }
 
-/** Карточка в списке рядом с картой: что, когда, где, режим, «На карте» и действие. */
+/** Карточка в списке рядом с картой: вид спорта, режим, что, когда, где, места, «На карте» и действие. */
 function FeedItem({
   event,
   selected,
@@ -600,24 +600,23 @@ function FeedItem({
       id={`feed-${event.id}`}
       className={`flex scroll-m-2 gap-3.5 rounded-lg border-2 border-ink p-3.5 ${selected ? 'bg-accent shadow-md' : 'bg-surface shadow-sm'}`}
     >
-      <SportTile sport={event.sport} />
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <h3 className="font-display text-[19px] leading-snug font-bold">
-            <Link to={href} className="no-underline hover:underline">
-              {event.title}
-            </Link>
-          </h3>
+      {/* Содержание — как в карточке профиля: вид спорта и режим, название, когда, где, места. */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="flex items-center gap-2 font-semibold">
+            <SportTile sport={event.sport} size={32} />
+            {event.sport.name}
+          </span>
           <JoinModeBadge mode={event.joinMode} />
         </div>
-        <p className="text-sm text-ink-muted">{formatWhen(event.startsAt, event.endsAt)}</p>
-        <p className="text-sm text-ink-muted">{event.address}</p>
-        <p className="text-sm text-ink-muted">
-          Организатор: <OrganizerLink organizer={event.organizer} />
-        </p>
-        <p className="text-sm text-ink-muted">
-          {EVENT_LEVEL_LABELS[event.level]} · {formatSeats(event.participantsCount, event.capacity)}
-        </p>
+        <h3 className="mt-1 text-[19px] leading-snug">
+          <Link to={href} className="no-underline hover:underline">
+            {event.title}
+          </Link>
+        </h3>
+        <MetaLine icon="calendar">{formatWhen(event.startsAt, event.endsAt)}</MetaLine>
+        <MetaLine icon="pin">{event.address}</MetaLine>
+        <MetaLine icon="people">{formatSeats(event.participantsCount, event.capacity)}</MetaLine>
         <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
           {onMap ? (
             <Button
