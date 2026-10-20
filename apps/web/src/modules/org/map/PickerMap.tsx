@@ -1,10 +1,10 @@
 // Карта выбора места (задача 2.9): площадки метками, своя точка — нажатием на свободное место.
 // Ленивая часть MapPicker: всё, что требует Leaflet.
 import type { Venue } from '@sport/shared/schemas/venues';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Marker, useMap, useMapEvents } from 'react-leaflet';
 import { pinIcon, venuePin } from '../../../shared/ui';
-import { BaseMap, cachedIcon } from './BaseMap';
+import { BaseMap, cachedIcon, PinScaleWatcher } from './BaseMap';
 import type { PlaceValue } from './MapPicker';
 
 export type PickerMapProps = {
@@ -16,9 +16,11 @@ export type PickerMapProps = {
 
 export function PickerMap({ venues, value, onPickVenue, onPickPoint }: PickerMapProps) {
   const selectedId = value?.kind === 'venue' ? value.venue.id : null;
+  const [scale, setScale] = useState(1);
   return (
     <BaseMap label="Карта для выбора места встречи" className="h-[420px] md:h-[520px]">
       <PointPicker onPick={onPickPoint} />
+      <PinScaleWatcher onChange={setScale} />
       <FollowSelection value={value} />
       {venues.map((venue) => {
         const selected = venue.id === selectedId;
@@ -28,8 +30,8 @@ export function PickerMap({ venues, value, onPickVenue, onPickPoint }: PickerMap
             key={venue.id}
             position={[venue.lat, venue.lng]}
             title={venue.name}
-            icon={cachedIcon(`venue:${venue.type}:${suitable}:${selected}`, () =>
-              venuePin({ type: venue.type, suitable, selected }),
+            icon={cachedIcon(`venue:${venue.type}:${suitable}:${selected}:${scale}`, () =>
+              venuePin({ type: venue.type, suitable, selected, scale }),
             )}
             zIndexOffset={selected ? 1000 : suitable ? 100 : 0}
             eventHandlers={{ click: () => onPickVenue(venue) }}
@@ -41,8 +43,8 @@ export function PickerMap({ venues, value, onPickVenue, onPickPoint }: PickerMap
           position={[value.lat, value.lng]}
           title="Своя точка встречи"
           zIndexOffset={1000}
-          icon={cachedIcon('point', () =>
-            pinIcon({ icon: 'pin', color: 'var(--color-accent)', selected: true }),
+          icon={cachedIcon(`point:${scale}`, () =>
+            pinIcon({ icon: 'pin', color: 'var(--color-accent)', selected: true, scale }),
           )}
         />
       )}

@@ -405,7 +405,7 @@ function EventsSplit({
           </Button>
         </div>
       )}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,480px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,540px)_minmax(0,1fr)]">
         {(wide || view === 'list') && (
           <EventList
             params={params}
@@ -417,13 +417,14 @@ function EventsSplit({
           />
         )}
         {(wide || view === 'map') && (
-          <div className="flex min-w-0 flex-col gap-2">
+          // Список листается вместе со страницей, а карта рядом закреплена и остаётся на экране.
+          <div className="flex min-w-0 flex-col gap-2 lg:sticky lg:top-4">
             <EventsMap
               filters={params}
               selectedId={selectedId}
               onSelect={selectFromMap}
               focus={focus}
-              className="h-[70vh] min-h-[420px] lg:h-[780px]"
+              className="h-[70vh] min-h-[420px] lg:h-[min(780px,calc(100dvh_-_7rem))]"
             />
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
               <span className="flex flex-wrap items-center gap-3 font-semibold">
@@ -542,8 +543,8 @@ function EventList({
       </div>
       <div
         aria-busy={feed.isFetching || undefined}
-        // Отступ справа и снизу — под жёсткую тень карточек, иначе прокрутка её обрезает.
-        className="flex flex-col gap-3.5 lg:max-h-[600px] lg:overflow-y-auto lg:pr-2.5 lg:pb-2.5"
+        // Без своей прокрутки: карточки целиком, страница листается одним ползунком.
+        className="flex flex-col gap-3.5"
       >
         {body}
       </div>

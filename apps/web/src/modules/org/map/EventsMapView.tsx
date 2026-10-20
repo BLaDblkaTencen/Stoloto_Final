@@ -4,7 +4,7 @@ import { EVENT_TIMEZONE, type EventMapItem } from '@sport/shared/schemas/events'
 import type { Sport } from '@sport/shared/schemas/sports';
 import type { Bbox, Venue } from '@sport/shared/schemas/venues';
 import type L from 'leaflet';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import { Link } from 'react-router';
 import {
@@ -16,7 +16,7 @@ import {
   VenueCard,
   venuePin,
 } from '../../../shared/ui';
-import { BaseMap, cachedIcon } from './BaseMap';
+import { BaseMap, cachedIcon, PinScaleWatcher } from './BaseMap';
 import { venueCardData } from './venueCardData';
 
 export type EventsMapViewProps = {
@@ -60,6 +60,8 @@ export function EventsMapView({
   className,
 }: EventsMapViewProps) {
   const markers = useRef(new Map<string, L.Marker>());
+  // Вблизи метки мельче: не закрывают соседние и точнее стоят на месте (pinScale).
+  const [scale, setScale] = useState(1);
   // С включёнными площадками встреча на площадке стоит ровно на её метке и закрыла бы её:
   // такие встречи показываем списком в попапе площадки, отдельной меткой — только свои точки.
   const atVenue = new Map<string, EventMapItem[]>(venues.map((venue) => [venue.id, []]));
@@ -73,6 +75,7 @@ export function EventsMapView({
   return (
     <BaseMap label="Карта встреч" className={className}>
       <BoundsWatcher onChange={onBoundsChange} />
+      <PinScaleWatcher onChange={setScale} />
       <FocusWatcher focus={focus} markers={markers.current} events={events} />
       {venues.map((venue) => {
         const suitable = venue.suitable ?? true;
@@ -85,8 +88,8 @@ export function EventsMapView({
             position={[venue.lat, venue.lng]}
             title={busy ? `${venue.name}: встреч ${here.length}` : venue.name}
             zIndexOffset={busy ? 500 : suitable ? 100 : 0}
-            icon={cachedIcon(`venue:${venue.type}:${suitable}:${busy}`, () =>
-              venuePin({ type: venue.type, suitable, selected: busy }),
+            icon={cachedIcon(`venue:${venue.type}:${suitable}:${busy}:${scale}`, () =>
+              venuePin({ type: venue.type, suitable, selected: busy, scale }),
             )}
           >
             {/* maxHeight: попап выше карты Leaflet сдвигает её при каждой перерисовке без конца. */}
@@ -134,8 +137,8 @@ export function EventsMapView({
             position={[event.lat, event.lng]}
             title={event.title}
             zIndexOffset={selected ? 1000 : 0}
-            icon={cachedIcon(`event:${slug}:${event.joinMode}:${selected}`, () =>
-              eventPin({ sportSlug: slug, joinMode: event.joinMode, selected }),
+            icon={cachedIcon(`event:${slug}:${event.joinMode}:${selected}:${scale}`, () =>
+              eventPin({ sportSlug: slug, joinMode: event.joinMode, selected, scale }),
             )}
           >
             <Popup minWidth={300} maxWidth={300}>
