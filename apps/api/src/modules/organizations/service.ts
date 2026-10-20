@@ -16,6 +16,7 @@ import { db, type Db, type Tx } from '../../db/client';
 import { organizationSports, organizations, sports } from '../../db/schema';
 import { AppError, errors } from '../../lib/errors';
 import type { SessionUser } from '../auth/session';
+import { resolveSport } from '../sports/service';
 import {
   checkPublishing,
   notRejected,
@@ -64,7 +65,7 @@ export async function createOrganization(
     return await db.transaction(async (tx) => {
       if (await findByOwner(user.id, tx)) throw alreadyExists();
       await assertNameFree(body.name, null, tx);
-      await assertSportsExist(body.sportIds, tx);
+      const sportIds = await resolveSports(body.sportIds, body.sportNames, user.id, tx);
 
       const [org] = await tx
         .insert(organizations)
@@ -77,7 +78,7 @@ export async function createOrganization(
           contacts: body.contacts ?? null,
         })
         .returning();
-      await replaceSports(org!.id, body.sportIds, tx);
+      await replaceSports(org!.id, sportIds, tx);
       return toOwner(org!, await sportsOf(org!.id, tx));
     });
   } catch (err) {
@@ -103,9 +104,8 @@ export async function updateMyOrganization(
     if (body.name !== undefined && orgNameKey(body.name) !== orgNameKey(org.name)) {
       await assertNameFree(body.name, org.id, tx);
     }
-    if (body.sportIds) await assertSportsExist(body.sportIds, tx);
-
-    const { sportIds, ...fields } = body;
+    const { sportIds: listed, sportNames, ...fields } = body;
+    const sportIds = listed && (await resolveSports(listed, sportNames, user.id, tx));
     const changes = Object.fromEntries(
       Object.entries(fields).filter(([, value]) => value !== undefined),
     );
@@ -229,6 +229,24 @@ async function assertSportsExist(ids: string[], ex: Executor) {
   if (found.length !== ids.length) {
     throw errors.validation({ sportIds: 'Некоторые виды спорта не найдены' });
   }
+}
+
+/**
+ * Виды спорта организации: выбранные из списка и свои варианты. Свой вариант с тем же ключом,
+ * что у вида из каталога («футбол » → «Футбол»), берёт его, новое название попадает в каталог.
+ */
+async function resolveSports(
+  sportIds: string[],
+  sportNames: string[] | undefined,
+  userId: string,
+  tx: Tx,
+): Promise<string[]> {
+  await assertSportsExist(sportIds, tx);
+  const custom: string[] = [];
+  for (const sportName of sportNames ?? []) {
+    custom.push((await resolveSport(tx, { sportName }, userId)).id);
+  }
+  return [...new Set([...sportIds, ...custom])];
 }
 
 async function replaceSports(organizationId: string, sportIds: string[], ex: Executor) {

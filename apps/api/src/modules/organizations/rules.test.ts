@@ -165,6 +165,39 @@ describe('схемы запросов', () => {
     expect(paths).toEqual(expect.arrayContaining(['name', 'sportIds']));
   });
 
+  it('создание: свои виды спорта — без списка или вместе с ним, дубли по ключу убраны', () => {
+    const own = createOrganizationBody.parse({ ...valid, sportIds: [], sportNames: ['Сквош'] });
+    expect(own.sportNames).toEqual(['Сквош']);
+    const both = createOrganizationBody.parse({
+      ...valid,
+      sportNames: ['Кик-боксинг', 'кик боксинг'],
+    });
+    expect(both.sportIds).toEqual([SPORT_ID]);
+    expect(both.sportNames).toEqual(['Кик-боксинг']);
+  });
+
+  it('создание: ни одного вида спорта или больше 10 вместе со своими — ошибка у sportIds', () => {
+    const paths = (body: object) =>
+      createOrganizationBody
+        .safeParse({ ...valid, ...body })
+        .error?.issues.map((i) => i.path.join('.'));
+    expect(paths({ sportIds: [], sportNames: [] })).toEqual(['sportIds']);
+    const names = Array.from({ length: 10 }, (_, i) => `Вид ${'абвгдежзик'[i]}`);
+    expect(paths({ sportNames: names })).toEqual(['sportIds']);
+    expect(paths({ sportIds: [], sportNames: ['!!'] })).toEqual(['sportNames.0']);
+  });
+
+  it('правка: свои виды спорта только вместе со списком — он заменяется целиком', () => {
+    expect(
+      updateOrganizationBody.safeParse({ sportNames: ['Сквош'] }).error?.issues[0]?.path,
+    ).toEqual(['sportNames']);
+    expect(updateOrganizationBody.parse({ sportIds: [], sportNames: ['Сквош'] })).toEqual({
+      sportIds: [],
+      sportNames: ['Сквош'],
+    });
+    expect(updateOrganizationBody.safeParse({ sportIds: [] }).success).toBe(false);
+  });
+
   it('правка: пустое тело не принимается, частичное — да', () => {
     expect(updateOrganizationBody.safeParse({}).success).toBe(false);
     expect(updateOrganizationBody.parse({ contacts: '+7 900 000-00-00' })).toEqual({

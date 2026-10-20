@@ -29,12 +29,14 @@
 
 | Метод и путь | Кто | Запрос | Успех | Ошибки |
 | --- | --- | --- | --- | --- |
-| `POST /api/organizations` | `organization` без организации | `createOrganizationBody`: `name` (2–100, пробелы схлопываются), `description` (10–1000), `activity` (2–100), `city?` (≤80), `contacts?` (≤300), `sportIds` (1–10, дубли убираются) | `201` `OrganizationOwner`, статус `pending` | 409 `ORG_ALREADY_EXISTS`; 409 `ORG_NAME_TAKEN` (имя уже у допущенной организации, иначе её нельзя будет одобрить); 422 (в т.ч. `fields.sportIds`, если вида спорта нет) |
+| `POST /api/organizations` | `organization` без организации | `createOrganizationBody`: `name` (2–100, пробелы схлопываются), `description` (10–1000), `activity` (2–100), `city?` (≤80), `contacts?` (≤300), `sportIds` (из списка, может быть пустым), `sportNames?` (свои варианты, 2–40 символов); вместе 1–10 видов, дубли убираются | `201` `OrganizationOwner`, статус `pending` | 409 `ORG_ALREADY_EXISTS`; 409 `ORG_NAME_TAKEN` (имя уже у допущенной организации, иначе её нельзя будет одобрить); 422 (в т.ч. `fields.sportIds`, если вида спорта нет или ни одного не выбрано) |
 | `GET /api/organizations/me` | `organization` | — | `200` `OrganizationOwner` | 404 `ORG_NOT_FOUND`: организации ещё нет, интерфейс показывает форму подачи |
-| `PATCH /api/organizations/me` | `organization` | `updateOrganizationBody`: любые поля частично, пустая строка очищает `city`/`contacts` | `200` `OrganizationOwner`, статус не меняется | 404; 409 `ORG_NAME_TAKEN`; 422 (пустое тело — «Нет изменений») |
+| `PATCH /api/organizations/me` | `organization` | `updateOrganizationBody`: любые поля частично, пустая строка очищает `city`/`contacts`; виды спорта заменяются целиком, `sportNames` — только вместе с `sportIds` | `200` `OrganizationOwner`, статус не меняется | 404; 409 `ORG_NAME_TAKEN`; 422 (пустое тело — «Нет изменений»; `fields.sportNames` без `sportIds`) |
 | `POST /api/organizations/me/resubmit` | `organization`, статус `rejected` | — | `200` `OrganizationOwner`: `pending`, причина и решение очищены | 404; 409 `ORG_NOT_REJECTED` |
 | `GET /api/organizations` | любой | `q?` (название и описание), `sportId?`, `city?`, `limit` (1–100, 20), `offset` (0) | `200` `{ items: OrganizationPublic[], total }` — только `approved`, по названию | 422 |
 | `GET /api/organizations/:id` | любой | — | `200` `OrganizationView`: `{ view: 'public', … }` или `{ view: 'owner', … }` для владельца и админа | 404 `ORG_NOT_FOUND` (чужую недопущенную не раскрываем) |
+
+Свой вид спорта (`sportNames`) ищется и создаётся так же, как `sportName` у события ([events.md](events.md), «Виды спорта»): по нормализованному ключу находится существующий («футбол » → «Футбол»), новое название попадает в каталог с `isCustom = true` без правки кода. Из дублей по ключу остаётся первый.
 
 Подписи статусов заявки — `ORG_STATUS_LABELS`. События на странице организации — `GET /api/events?organizationId=:id` (участник 1).
 
