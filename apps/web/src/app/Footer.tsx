@@ -38,12 +38,7 @@ export function Footer() {
           <FooterNav title="Клубам и сообществам">
             <FooterLink to="/organizations">Организации</FooterLink>
             {guest && (
-              <>
-                <FooterLink to={REGISTER_ORGANIZATION}>Зарегистрировать организацию</FooterLink>
-                <p className="text-sm text-ink-muted">
-                  Страница клуба появится после проверки администратором
-                </p>
-              </>
+              <FooterLink to={REGISTER_ORGANIZATION}>Зарегистрировать организацию</FooterLink>
             )}
             {role === 'organization' && <FooterLink to="/org">Кабинет организации</FooterLink>}
             {role === 'admin' && (
